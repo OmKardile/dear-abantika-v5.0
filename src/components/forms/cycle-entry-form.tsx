@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Droplet, Activity, Scale, Thermometer, Pill, StickyNote } from "lucide-react";
 import { SYMPTOMS, type CycleEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Portal } from "@/components/premium/portal";
 
 interface Props {
   open: boolean;
@@ -71,8 +72,9 @@ export function CycleEntryForm({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
+          <Portal>
+                  <motion.div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -86,7 +88,7 @@ export function CycleEntryForm({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="relative w-full max-w-md max-h-[92dvh] overflow-y-auto no-scrollbar rounded-t-[32px] sm:rounded-[32px] surface-elevated"
+            className="relative w-full max-w-md max-h-[92dvh] overflow-y-auto no-scrollbar rounded-[32px] surface-elevated"
           >
             {/* drag handle */}
             <div className="sticky top-0 z-10 pt-3 pb-2 bg-elevated/80 backdrop-blur-xl rounded-t-[32px]">
@@ -271,6 +273,7 @@ export function CycleEntryForm({
             </div>
           </motion.div>
         </motion.div>
+        </Portal>
       )}
     </AnimatePresence>
   );

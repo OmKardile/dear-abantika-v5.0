@@ -376,3 +376,24 @@ Stage Summary:
 - FAB/nav collision: fixed (FABs use --nav-h variable to sit above nav)
 - Undo snackbar: repositioned above nav
 - No transparent/floating nav effects — clean separation as requested
+
+---
+Task ID: v3.3-form-overlay-nav-style
+Agent: main (orchestrator)
+Task: Fix form/nav overlap (forms trapped in stacking context), make nav stylish, center popups
+
+Work Log:
+- Root cause of form/nav overlap: forms were rendered inline inside <main> (z-10 stacking context), so their z-[100] was trapped BELOW the nav's z-50 at body level. Nav drew on top of form sheets.
+- Fix: Created shared Portal component (src/components/premium/portal.tsx) using useSyncExternalStore for SSR safety. Wrapped ALL 7 form sheets (reminder, cycle-entry, diary, hydration-log, mood-dialog, mood-log, wishlist) with <Portal> so they escape the main stacking context and render at document.body level — now z-[100] correctly sits above nav z-50
+- Changed all form sheets from items-end (bottom sheet) to items-center (centered modal) per user request "popup should totally be most up" — forms now appear as centered dialogs with full rounded-[32px] corners and p-4 padding
+- Made the bottom nav stylish while keeping it solid/non-overlapping: added a subtle gradient top-edge accent line (linear-gradient transparent→border→transparent), rounded-[18px] active pill with inset-0.5, py-1.5 padding, minHeight instead of fixed height for better fit, scale 0.88 inactive icons
+- Verified: form popup centered, backdrop covers nav completely (no overlap), nav z-50 < sheet z-100, sheet parent = BODY
+- VLM: form popup "centered, nav hidden behind backdrop, no overlap" | nav style "9/10, clean solid background with subtle top edge accent and gradient active tab"
+- Home page: no content/nav overlap, hero below status bar, nav stylish and solid
+- 0 console errors, 0 lint errors
+
+Stage Summary:
+- Form/nav overlap: FIXED via Portal (forms now render at body level above nav)
+- Popup position: changed from bottom-sheet to centered modal ("totally most up")
+- Nav style: made stylish with gradient top edge + refined active pill, still solid and non-overlapping
+- All 7 forms portaled; shared Portal helper created

@@ -88,7 +88,7 @@ export function AppShell({
         </div>
       </main>
 
-      {/* ===== Solid bottom navigation (NOT floating, NOT transparent) ===== */}
+      {/* ===== Stylish solid bottom navigation ===== */}
       <motion.nav
         initial={reduce ? false : { y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -97,10 +97,19 @@ export function AppShell({
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Primary"
       >
-        <div className="border-t border-border bg-elevated shadow-lifted">
+        {/* Subtle gradient top edge for a premium finished look */}
+        <div
+          aria-hidden
+          className="h-[2px] w-full opacity-60"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--border), transparent)",
+          }}
+        />
+        <div className="bg-elevated shadow-lifted">
           <div
-            className="flex items-stretch justify-between px-2"
-            style={{ height: NAV_HEIGHT }}
+            className="flex items-stretch justify-between px-1.5 py-1.5"
+            style={{ minHeight: NAV_HEIGHT }}
           >
             {TABS.map((tab) => {
               const isActive = active === tab.id;
@@ -111,19 +120,19 @@ export function AppShell({
                   onClick={() => onChange(tab.id)}
                   aria-label={tab.label}
                   aria-current={isActive ? "page" : undefined}
-                  className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-colors"
+                  className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-[18px] transition-colors"
                 >
                   {isActive && (
                     <motion.div
                       layoutId="nav-active"
-                      className="absolute inset-1 rounded-2xl gradient-primary-bg shadow-glow"
+                      className="absolute inset-0.5 rounded-[16px] gradient-primary-bg shadow-glow"
                       transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
                   )}
                   <div className="relative z-10 flex flex-col items-center gap-1">
                     <motion.div
                       animate={
-                        isActive ? { scale: 1, y: 0 } : { scale: 0.9, y: 0 }
+                        isActive ? { scale: 1, y: 0 } : { scale: 0.88, y: 0 }
                       }
                       transition={{ type: "spring", stiffness: 400, damping: 25 }}
                     >

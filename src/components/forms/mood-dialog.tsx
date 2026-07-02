@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { MOODS } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Portal } from "@/components/premium/portal";
 
 export function MoodDialog({
   open,
@@ -18,8 +19,9 @@ export function MoodDialog({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4"
+          <Portal>
+                  <motion.div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -76,6 +78,7 @@ export function MoodDialog({
             </div>
           </motion.div>
         </motion.div>
+          </Portal>
       )}
     </AnimatePresence>
   );

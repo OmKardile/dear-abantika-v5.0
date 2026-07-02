@@ -10,6 +10,7 @@ import {
   type ReminderCategory,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Portal } from "@/components/premium/portal";
 
 interface Props {
   open: boolean;
@@ -57,8 +58,9 @@ export function ReminderForm({ open, onOpenChange, existing, onSave, onDelete }:
   return (
     <AnimatePresence>
       {open && (
+        <Portal>
         <motion.div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -72,7 +74,7 @@ export function ReminderForm({ open, onOpenChange, existing, onSave, onDelete }:
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="relative w-full max-w-md max-h-[94dvh] overflow-y-auto no-scrollbar rounded-t-[32px] sm:rounded-[32px] surface-elevated"
+            className="relative w-full max-w-md max-h-[94dvh] overflow-y-auto no-scrollbar rounded-[32px] surface-elevated"
           >
             <div className="sticky top-0 z-10 pt-3 pb-3 px-6 bg-elevated/90 backdrop-blur-xl rounded-t-[32px] border-b border-divider">
               <div className="mx-auto w-10 h-1.5 rounded-full bg-border mb-3" />
@@ -187,6 +189,7 @@ export function ReminderForm({ open, onOpenChange, existing, onSave, onDelete }:
             </div>
           </motion.div>
         </motion.div>
+        </Portal>
       )}
     </AnimatePresence>
   );
