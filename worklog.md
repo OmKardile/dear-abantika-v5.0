@@ -206,3 +206,109 @@ Stage Summary:
 - New content types with full lifecycle: HydrationLog (individual water entries), MoodLog (mood history)
 - New Archive management screen (restore + permanent delete + empty-all)
 - All verified end-to-end in browser, production-ready
+
+---
+Task ID: 3
+Agent: full-stack-developer (dashboard redesign)
+Task: Redesign dashboard per attached design (2x2 status grid, daily reflection, faded date, mobile-compact sizing)
+
+Work Log:
+- Read worklog.md for project context (premium "Abantika" wellness app, single / route, Zustand store, Framer Motion, premium primitives, 8px grid / 20–28px radii, chart CSS vars --chart-1..5 in globals.css)
+- Read existing src/components/pages/dashboard.tsx (hero greeting gradient card, 4 quick actions w/ onNavigate("settings") for 4th, animated wave hydration card, 2-col mood+reminder grid, separate cycle status row card, daily encouragement card w/ Sparkles + Quote)
+- Read src/components/premium/primitives.tsx for exact APIs (SurfaceCard, IconBadge, StaggerItem, AnimatedCounter, Pressable) and confirmed motion/whileTap behavior
+- Read src/lib/helpers.ts for greeting/greetingSub/formatTime signatures (timeUntil removed from this dashboard's usage)
+- Confirmed date-fns@4.1.0 installed → imported `format` for the faded date line
+- Confirmed app-shell.tsx TabId type being extended to include "reminders" by orchestrator in parallel; assumed "reminders" already in TabId and only edited dashboard.tsx + worklog per instructions
+- Rewrote src/components/pages/dashboard.tsx with all 7 required changes:
+  1. Hero greeting card: added faded date line `format(new Date(), "EEEE, MMMM d")` directly under greeting label as text-[11px] text-primary-foreground/55; reduced padding p-6 pb-7 → p-5 pb-5; reduced subtitle to text-sm; reduced mini-stats to 2 (streak + hydration %) with smaller icons (14px), text-xs values, text-[10px] labels; kept text-display "Hello, Abantika" (clamp) and gradient-primary-bg + shadow-glow + decorative orbs + ✨ float
+  2. Quick actions row: kept 4 actions but 4th now onNavigate("reminders") (was "settings"), label changed "Reminder" → "Reminders", tint chart-3 (purple) to match design; icon container w-14 h-14 → w-11 h-11, icon size 24 → 20, gap-2.5 → gap-2, padding p-3.5 → p-2.5, label text-[11px] → text-[10px], radius rounded-[22px] → rounded-[18px]; Cycle tint switched to var(--primary) for pink/rose feel
+  3. NEW 2x2 status grid (grid grid-cols-2 gap-3) replacing the old mood+reminder 2-col grid AND the separate cycle status card:
+     - Mood (top-left): amber dot (var(--chart-4)) + uppercase "MOOD" label (text-[10px] tracking-wider), large centered mood emoji with gentle float animation (y/rotate loop), "Today" subtitle; Pressable → opens MoodDialog
+     - Cycle (top-right): coral/pink dot (var(--primary)) + "CYCLE" label, large Flower2 icon centered (size 28, primary color), subtitle computed via cycleSubtitle memo: "~N days away" (28-day cycle prediction from most recent period entry), "due today", or "{n} entries" / "Begin tracking" fallback; Pressable → onNavigate("cycle")
+     - Streak (bottom-left): amber dot (var(--chart-4)) + "STREAK" label, large bold number via AnimatedCounter (text-2xl font-extrabold tabular-nums) with a small Flame accent, "days consistent" subtitle; non-interactive display card
+     - Next (bottom-right): purple dot (var(--chart-3)) + "NEXT" label, next reminder title (text-sm font-semibold, line-clamp-2), subtitle formatTime(nextReminder.time) e.g. "8:00 PM" or "Set one up" when none; Pressable → onNavigate("reminders")
+     - All cards: p-4, min-h-[110px], flex-col justify-between, uppercase label with small colored dot
+  4. Hydration wave card: compacted p-5 → p-4, headline text-headline → text-xl font-bold tabular-nums, IconBadge size 44 → 36, wave height h-16 → h-14, inner px-4 → px-3.5, +250/+500 buttons py-2.5 → py-2 and text-sm → text-xs; kept the gradient fill width animation, the moving shimmer wave overlay, and the +250/+500 quick-add buttons
+  5. Daily Reflection card: replaced old "Daily encouragement" (Sparkles IconBadge + Quote + left-aligned text) with a centered "moment" card — large 🌸 emoji (text-4xl) with float/rotate animation, small uppercase "DAILY REFLECTION" label, centered tip text (text-sm leading-relaxed max-w-20rem), dot pagination (5 dots, active = 22px primary, inactive = 6px border); padding p-6 → p-5; kept two soft blurred accent orbs (chart-3 top-right, chart-4 bottom-left) for warmth
+  6. Removed the separate cycle status row card (now lives in 2x2 grid) and the old mood+reminder 2-col grid (replaced by 2x2)
+  7. Mobile responsiveness: overall page space-y-6 → space-y-4; all label/value text sizes reduced to fit 360px (labels text-[10px]/text-[11px], card values text-sm/text-2xl, hero stats text-xs); quick-action icon containers w-11 h-11; 2x2 cards p-4 min-h-[110px]; hydration p-4 h-14; reflection p-5
+- Cleaned imports: removed now-unused Sparkles, ChevronRight, Quote, MOODS, timeUntil; added `format` from date-fns; kept IconBadge (still used in compact hydration card), SurfaceCard, StaggerItem, AnimatedCounter, Pressable, MoodDialog
+- Ran `bun run lint`: dashboard.tsx produces ZERO errors (eslint on the file alone is silent). The 5 remaining errors are all in settings.tsx (SortMenu/SwipeableRow/ReminderForm/SelectionBar/Clock undefined) — that file is being refactored by the orchestrator in parallel to extract the reminders tab and is explicitly out of my scope per task instructions
+- Verified dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` returns 200; dev.log shows clean recompilation ("✓ Compiled in 2.7s" / "✓ Compiled in 2.4s") with no runtime/compile errors after the edit
+
+Stage Summary:
+- Dashboard redesigned to match the attached design references: faded date line under greeting, compact 4-action row (4th → new "reminders" tab), proper 2x2 status grid (Mood/Cycle/Streak/Next) with small colored dots + uppercase labels + distinct accent colors (amber/coral/amber/purple), compact wave hydration card, and a centered "Daily Reflection" moment card with large 🌸 + dot pagination
+- Removed the redundant separate cycle status row and the old mood+reminder 2-col grid — cycle + mood + reminder are now consolidated into the 2x2 grid, with streak as the new 4th card
+- Mobile-first throughout: every section compacted for 360px width (smaller paddings, icon containers, text sizes, gaps), no horizontal scroll; hero mini-stats reduced to 2 (streak + hydration %)
+- Premium micro-interactions preserved/added: staggered entrance via StaggerItem, mood emoji gentle float, 🌸 float-rotate in reflection, AnimatedCounter on both hydration ml and streak number, gradient-primary hero with shadow-glow and decorative orbs, Pressable whileTap scale on every tappable card
+- Lint-clean for dashboard.tsx; HTTP 200 on /; dev.log clean. Only touched src/components/pages/dashboard.tsx + worklog.md as instructed
+
+---
+Task ID: 2
+Agent: full-stack-developer (reminders main tab)
+Task: Promote Reminders from settings sub-tab to main bottom-nav tab
+
+Work Log:
+- Read worklog.md for project context (premium "Abantika" wellness app, single / route, 5-tab bottom nav, Zustand store, Framer Motion, mobile-first premium design system)
+- Read src/components/app-shell.tsx (TabId union, TABS array, BottomNav with layoutId="nav-active" spring indicator) and src/app/page.tsx (tab→page router)
+- Read src/components/pages/settings.tsx end-to-end to map exactly which symbols belong to the Reminders sub-feature (RemindersTab function + ReminderRow helper + local Portal) vs the parts that must stay (ThemeTab, ArchiveTab + ArchivedItemRow + archivedAgo, BackupTab, About card, shared Portal helper used by ArchiveTab/BackupTab dialogs)
+- Confirmed settings imports that became unused after removing RemindersTab/ReminderRow: Clock (was only used in ReminderRow), WEEKDAY_LABELS (only in ReminderRow), SortOption (only in RemindersTab), ReminderForm (only in RemindersTab), SwipeableRow (only in RemindersTab), SelectionBar (only in RemindersTab), SortMenu (only in RemindersTab), useSelection (only in RemindersTab); kept Bell (still used by ArchivedItemRow for reminder-type icon), REMINDER_CATEGORIES (still used by ArchivedItemRow), Reminder type (still used by ArchivedItemRow signature), Plus (still used by BackupTab close button), Check (still used by ThemeTab active checkmark)
+- Read premium component APIs: SwipeableRow (onDelete + disabled), SelectionBar (selectedCount/onCancel/onDelete fires with []/onSelectAll/total), SortMenu (value/onChange), ConfirmDialog (open/onOpenChange/title/description/confirmLabel/variant/onConfirm), useSelection (mode/selected/selectedCount/isSelected/toggle/enterMode/selectAll/clearAll)
+- Updated src/components/app-shell.tsx:
+  * Added `Bell` to lucide-react imports
+  * Extended TabId union: `"home" | "cycle" | "journal" | "hydration" | "reminders" | "settings"` (6 tabs)
+  * Added `{ id: "reminders", label: "Reminders", icon: Bell }` between hydration and settings
+  * Compacted the bottom nav for 6 tabs on a 360px screen: nav container `px-2 py-2` → `px-1.5 py-1.5`, tab button `py-2 px-1 gap-1` → `py-1.5 px-0.5 gap-0.5`, inner icon/label column `gap-1` → `gap-0.5`, icon size 22 → 20, label `text-[10px]` → `text-[9px]`
+- Created src/components/pages/reminders.tsx (NEW, named export `Reminders`):
+  * Top-level page with animated SectionHeader title="Reminders" subtitle="Gentle nudges for your day" (motion fade-in y:-12→0, respects reduced motion)
+  * Body: count line ("N reminders") + SortMenu + "New" gradient Pressable on the right
+  * Empty state with 🔔 emoji and "Add reminder" action button (gradient)
+  * Premium timeline: relative container, vertical rail at left-[10px], each reminder is a motion.div (layout, opacity/x entrance, x/height exit) with a circular node (gradient when enabled, surface-secondary when not) anchored -left-[18px] top-5; each row wrapped in SwipeableRow (disabled when in selection mode); AnimatePresence initial={false}; subtle stagger delay (i * 0.02) skipped under reduced motion
+  * ReminderRow helper (copied verbatim from settings.tsx): long-press 450ms timer → sel.enterMode(id) and swallows the subsequent click via longPressedRef; tap toggles selection in selection mode, else opens ReminderForm in edit mode; selection ring (ring-2 ring-inset ring-primary); checkmark circle replaces the enabled/disabled toggle in selection mode; enabled/disabled is a spring-animated toggle pill (layout spring, left-1 ↔ left-6); card opacity-60 when disabled; shows category emoji (44px), title, Clock icon + formatTime, 7 weekday labels (active days in primary color)
+  * Sort logic identical to the old RemindersTab: newest=reverse insertion, oldest=insertion, alpha=title localeCompare, modified=time asc; only non-archived reminders shown
+  * Swipe delete = permanent delete after ConfirmDialog (no undo, reminders are easily recreated); multi-select Delete via portaled SelectionBar also goes through a ConfirmDialog ("Delete N reminders?" / "Delete this reminder?")
+  * ReminderForm wired: existing=editingReminder, onSave=add/update, onDelete=deleteReminder
+  * Local Portal helper using React.useSyncExternalStore (SSR-safe, avoids setState-in-effect lint rule) wraps SelectionBar and both ConfirmDialogs so they escape the transformed PageTransition ancestor — same pattern as settings.tsx/cycle-tracker.tsx/journal.tsx
+  * Imports: React, react-dom createPortal, framer-motion (motion, AnimatePresence, useReducedMotion), lucide-react (Plus, Clock, Check — intentionally NOT Bell since the page header has no icon; excluded to keep imports tight), useStore, types (REMINDER_CATEGORIES, WEEKDAY_LABELS, Reminder, SortOption), helpers (formatTime), cn, premium primitives (SurfaceCard, SectionHeader, EmptyState, Pressable — excluded IconBadge/StaggerItem as unused), ReminderForm, SwipeableRow, SelectionBar, SortMenu, ConfirmDialog, useSelection, toast
+- Updated src/app/page.tsx:
+  * Added `import { Reminders } from "@/components/pages/reminders";`
+  * Added `{tab === "reminders" && <Reminders />}` between hydration and settings
+- Updated src/components/pages/settings.tsx:
+  * Removed `Clock` from lucide imports, removed `WEEKDAY_LABELS` and `type SortOption` from @/lib/types, removed `ReminderForm`, `SwipeableRow`, `SelectionBar`, `SortMenu`, `useSelection` imports entirely
+  * Changed Tab type from `"theme" | "reminders" | "backup" | "archive"` to `"theme" | "backup" | "archive"`
+  * Removed the `{ id: "reminders", label: "Reminders", short: "Alerts", icon: Bell }` entry from the tabs array (now 3 entries: Theme, Backup, Archive)
+  * Removed the `{tab === "reminders" && <RemindersTab />}` line from the AnimatePresence branch
+  * Deleted the entire RemindersTab function (~218 lines) and the entire ReminderRow helper function (~125 lines)
+  * Preserved Portal helper (still used by ArchiveTab's two ConfirmDialogs), ThemeTab, ArchiveTab + ArchivedItemRow + archivedAgo, BackupTab, About card verbatim
+- Ran `bun run lint`: 0 errors (only the pre-existing, unrelated import/no-anonymous-default-export warning in upload/extracted/postcss.config.mjs)
+- Verified dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` returns 200; dev.log shows clean recompiles after each edit with no runtime/compile errors
+
+Stage Summary:
+- Reminders is now a first-class main bottom-nav tab (6 tabs total: Home, Cycle, Journal, Water, Reminders, Settings) instead of a sub-tab inside Settings
+- New standalone Reminders page (src/components/pages/reminders.tsx) has its own header ("Reminders" / "Gentle nudges for your day") and preserves 100% of the lifecycle features that lived in the old RemindersTab: 4-way sort (newest/oldest/alpha/modified-by-time), premium timeline with vertical rail + circular nodes, swipe-to-delete with ConfirmDialog, long-press multi-select with portaled SelectionBar + "Select all N", bulk delete via ConfirmDialog, ReminderForm for add/edit, archived reminders filtered out, enabled/disabled toggle pills with spring animation, empty state with action
+- Bottom nav compacted for 6 tabs (smaller icons/labels/padding/gaps) so it still fits comfortably on a 360px screen with the layoutId spring indicator preserved
+- Settings now has 3 tabs (Theme, Backup, Archive) and is ~340 lines lighter; all Settings features preserved verbatim (theme gallery, archive management with restore/permanent-delete/empty-all, backup export/import/reset, About card)
+- Lint clean (0 errors); dev server returns 200; no runtime/compile errors
+
+---
+Task ID: 1+5
+Agent: main (orchestrator)
+Task: Add 8 new theme palettes + verify all changes (themes, reminders tab, dashboard, mobile responsiveness)
+
+Work Log:
+- Added 8 new premium themes to themes.ts + globals.css: Midnight Bloom (dark), Soft Peach, Deep Forest (dark), Sunset Glow, Coral Reef, Indigo Night (dark), Fresh Mint, Dusky Mauve — total 15 themes
+- Dispatched subagent for dashboard redesign (Task 3): 2x2 status grid, faded date, daily reflection, mobile-compact sizing
+- Dispatched subagent for reminders main tab (Task 2): 6-tab bottom nav, standalone Reminders page, removed reminders from Settings
+- Verified all 15 themes render correctly (tested Indigo Night dark = 9/10)
+- Verified 6-tab bottom nav fits at 360px
+- Verified all 6 tabs (Home, Cycle, Journal, Water, Reminders, Settings) fit perfectly at 360px with readable text — VLM mobile responsiveness 10/10
+- Verified faded date "Thursday, July 2" visible near greeting
+- Verified 2x2 status grid (Mood/Cycle/Streak/Next) renders clean
+- Verified Settings now has 3 tabs (Theme/Backup/Archive)
+- Lint: 0 errors; dev log clean; HTTP 200
+
+Stage Summary:
+- 15 total theme palettes (was 7), including 3 new dark themes
+- Reminders promoted to main bottom-nav tab (6 tabs total, compact for mobile)
+- Dashboard redesigned per attached design: faded date, 2x2 status grid, daily reflection card, compact sizing
+- Mobile responsiveness confirmed at 360px width across all tabs

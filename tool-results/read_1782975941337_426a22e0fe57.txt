@@ -1,0 +1,1101 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { createPortal } from "react-dom";
+     5→import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+     6→import {
+     7→  Palette,
+     8→  Bell,
+     9→  Database,
+    10→  Archive as ArchiveIcon,
+    11→  Plus,
+    12→  Check,
+    13→  Download,
+    14→  Upload,
+    15→  Shield,
+    16→  Heart,
+    17→  Clock,
+    18→  Trash2,
+    19→  Info,
+    20→  ArchiveRestore,
+    21→  Droplet,
+    22→  Sparkles,
+    23→  BookHeart,
+    24→  ShoppingBag,
+    25→} from "lucide-react";
+    26→import { useStore } from "@/lib/store";
+    27→import { THEMES } from "@/lib/themes";
+    28→import {
+    29→  REMINDER_CATEGORIES,
+    30→  WEEKDAY_LABELS,
+    31→  type Reminder,
+    32→  type CycleEntry,
+    33→  type JournalEntry,
+    34→  type WishlistItem,
+    35→  type SortOption,
+    36→} from "@/lib/types";
+    37→import { formatTime, downloadJson } from "@/lib/helpers";
+    38→import { cn } from "@/lib/utils";
+    39→import {
+    40→  SurfaceCard,
+    41→  SectionHeader,
+    42→  IconBadge,
+    43→  EmptyState,
+    44→  StaggerItem,
+    45→  Pressable,
+    46→} from "@/components/premium/primitives";
+    47→import { ReminderForm } from "@/components/forms/reminder-form";
+    48→import { SwipeableRow } from "@/components/premium/swipeable-row";
+    49→import { SelectionBar } from "@/components/premium/selection-bar";
+    50→import { SortMenu } from "@/components/premium/sort-menu";
+    51→import { ConfirmDialog } from "@/components/premium/confirm-dialog";
+    52→import { useSelection } from "@/hooks/use-selection";
+    53→import { toast } from "@/hooks/use-toast";
+    54→
+    55→type Tab = "theme" | "reminders" | "backup" | "archive";
+    56→
+    57→export function Settings() {
+    58→  const reduce = useReducedMotion();
+    59→  const [tab, setTab] = React.useState<Tab>("theme");
+    60→
+    61→  const tabs: {
+    62→    id: Tab;
+    63→    label: string;
+    64→    short: string;
+    65→    icon: React.ComponentType<{ size?: number }>;
+    66→  }[] = [
+    67→    { id: "theme", label: "Theme", short: "Theme", icon: Palette },
+    68→    { id: "reminders", label: "Reminders", short: "Alerts", icon: Bell },
+    69→    { id: "backup", label: "Backup", short: "Backup", icon: Database },
+    70→    { id: "archive", label: "Archive", short: "Archive", icon: ArchiveIcon },
+    71→  ];
+    72→
+    73→  return (
+    74→    <div className="space-y-6">
+    75→      <motion.div
+    76→        initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12 }}
+    77→        animate={{ opacity: 1, y: 0 }}
+    78→        transition={{ duration: 0.5 }}
+    79→      >
+    80→        <SectionHeader title="Settings" subtitle="Make it yours" />
+    81→      </motion.div>
+    82→
+    83→      {/* Tab switcher */}
+    84→      <div className="flex p-1 rounded-full surface-card">
+    85→        {tabs.map((t) => (
+    86→          <button
+    87→            key={t.id}
+    88→            onClick={() => setTab(t.id)}
+    89→            className="relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold min-w-0"
+    90→          >
+    91→            {tab === t.id && (
+    92→              <motion.div
+    93→                layoutId="settings-tab"
+    94→                className="absolute inset-0 rounded-full gradient-primary-bg shadow-glow"
+    95→                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+    96→              />
+    97→            )}
+    98→            <span
+    99→              className={cn(
+   100→                "relative z-10 flex items-center gap-1.5 min-w-0",
+   101→                tab === t.id ? "text-primary-foreground" : "text-text-secondary"
+   102→              )}
+   103→            >
+   104→              <t.icon size={15} />
+   105→              <span className="hidden xs:inline sm:inline truncate">{t.short}</span>
+   106→            </span>
+   107→          </button>
+   108→        ))}
+   109→      </div>
+   110→
+   111→      <AnimatePresence mode="wait">
+   112→        <motion.div
+   113→          key={tab}
+   114→          initial={{ opacity: 0, y: 12 }}
+   115→          animate={{ opacity: 1, y: 0 }}
+   116→          exit={{ opacity: 0, y: -8 }}
+   117→          transition={{ duration: 0.3 }}
+   118→        >
+   119→          {tab === "theme" && <ThemeTab />}
+   120→          {tab === "reminders" && <RemindersTab />}
+   121→          {tab === "backup" && <BackupTab />}
+   122→          {tab === "archive" && <ArchiveTab />}
+   123→        </motion.div>
+   124→      </AnimatePresence>
+   125→
+   126→      {/* About */}
+   127→      <SurfaceCard className="p-5">
+   128→        <div className="flex items-center gap-3 mb-3">
+   129→          <IconBadge icon={Info} variant="soft" size={40} />
+   130→          <div>
+   131→            <p className="text-title text-text-primary">About Abantika</p>
+   132→            <p className="text-caption text-text-secondary">Version 2.0 · Premium</p>
+   133→          </div>
+   134→        </div>
+   135→        <p className="text-body text-text-secondary leading-relaxed">
+   136→          A private wellness companion. All your data lives only on this device —
+   137→          nothing is ever sent anywhere. Crafted with care for your daily rituals.
+   138→        </p>
+   139→        <div className="mt-4 flex items-center gap-1.5 text-caption text-text-tertiary">
+   140→          Made with <Heart size={12} className="text-primary" fill="currentColor" /> for gentle days
+   141→        </div>
+   142→      </SurfaceCard>
+   143→    </div>
+   144→  );
+   145→}
+   146→
+   147→/* ============== THEME TAB ============== */
+   148→function ThemeTab() {
+   149→  const { theme, setTheme } = useStore();
+   150→  return (
+   151→    <div className="space-y-4">
+   152→      <p className="text-body text-text-secondary px-1">
+   153→        Choose a palette that feels like home. Transitions are instant.
+   154→      </p>
+   155→      <div className="space-y-4">
+   156→        {THEMES.map((t, i) => {
+   157→          const active = theme === t.id;
+   158→          return (
+   159→            <StaggerItem key={t.id} index={i}>
+   160→              <Pressable
+   161→                onClick={() => setTheme(t.id)}
+   162→                className="w-full text-left"
+   163→              >
+   164→                <SurfaceCard
+   165→                  className={cn(
+   166→                    "relative overflow-hidden p-5 transition-all items-center",
+   167→                    active && "ring-2 ring-primary shadow-glow"
+   168→                  )}
+   169→                >
+   170→                  <div className="flex items-center gap-4">
+   171→                    {/* mini device preview */}
+   172→                    <div
+   173→                      className="relative w-16 h-24 rounded-2xl overflow-hidden shrink-0 border"
+   174→                      style={{
+   175→                        backgroundColor: t.swatches[2],
+   176→                        borderColor: t.swatches[0] + "33",
+   177→                      }}
+   178→                    >
+   179→                      <div
+   180→                        className="absolute top-2 left-2 right-2 h-4 rounded-md"
+   181→                        style={{ backgroundColor: t.swatches[1] }}
+   182→                      />
+   183→                      <div
+   184→                        className="absolute top-8 left-2 right-2 h-6 rounded-lg"
+   185→                        style={{
+   186→                          backgroundImage: `linear-gradient(135deg, ${t.swatches[0]}, ${t.swatches[3]})`,
+   187→                        }}
+   188→                      />
+   189→                      <div className="absolute top-16 left-2 right-2 h-2 rounded-full" style={{ backgroundColor: t.swatches[1], opacity: 0.6 }} />
+   190→                      <div className="absolute top-20 left-2 w-8 h-2 rounded-full" style={{ backgroundColor: t.swatches[1], opacity: 0.4 }} />
+   191→                    </div>
+   192→
+   193→                    <div className="flex-1 min-w-0">
+   194→                      <div className="flex items-center gap-2">
+   195→                        <span className="text-xl">{t.emoji}</span>
+   196→                        <p className="text-title text-text-primary">{t.name}</p>
+   197→                      </div>
+   198→                      <p className="text-caption text-text-secondary mt-0.5">
+   199→                        {t.tagline}
+   200→                      </p>
+   201→                      {/* swatches */}
+   202→                      <div className="flex gap-1.5 mt-2.5">
+   203→                        {t.swatches.map((s, idx) => (
+   204→                          <span
+   205→                            key={idx}
+   206→                            className="w-6 h-6 rounded-lg border border-border"
+   207→                            style={{ backgroundColor: s }}
+   208→                          />
+   209→                        ))}
+   210→                      </div>
+   211→                    </div>
+   212→
+   213→                    {/* active check */}
+   214→                    <AnimatePresence>
+   215→                      {active && (
+   216→                        <motion.div
+   217→                          initial={{ scale: 0 }}
+   218→                          animate={{ scale: 1 }}
+   219→                          exit={{ scale: 0 }}
+   220→                          transition={{ type: "spring", stiffness: 400, damping: 20 }}
+   221→                          className="w-7 h-7 rounded-full gradient-primary-bg flex items-center justify-center shrink-0"
+   222→                        >
+   223→                          <Check size={16} className="text-primary-foreground" strokeWidth={3} />
+   224→                        </motion.div>
+   225→                      )}
+   226→                    </AnimatePresence>
+   227→                  </div>
+   228→                </SurfaceCard>
+   229→              </Pressable>
+   230→            </StaggerItem>
+   231→          );
+   232→        })}
+   233→      </div>
+   234→    </div>
+   235→  );
+   236→}
+   237→
+   238→/* ============== REMINDERS TAB ============== */
+   239→function RemindersTab() {
+   240→  const {
+   241→    reminders,
+   242→    addReminder,
+   243→    updateReminder,
+   244→    deleteReminder,
+   245→    bulkDeleteReminders,
+   246→  } = useStore();
+   247→  const [formOpen, setFormOpen] = React.useState(false);
+   248→  const [editing, setEditing] = React.useState<string | undefined>();
+   249→  const [sort, setSort] = React.useState<SortOption>("newest");
+   250→  const [confirmSingle, setConfirmSingle] = React.useState<Reminder | undefined>();
+   251→  const [confirmBulk, setConfirmBulk] = React.useState(false);
+   252→
+   253→  const editingReminder = reminders.find((r) => r.id === editing);
+   254→
+   255→  // Only show non-archived reminders here. Archived ones live in the Archive tab.
+   256→  const activeReminders = React.useMemo(
+   257→    () => reminders.filter((r) => !r.archived),
+   258→    [reminders]
+   259→  );
+   260→
+   261→  const sorted = React.useMemo(() => {
+   262→    const arr = [...activeReminders];
+   263→    switch (sort) {
+   264→      case "oldest":
+   265→        // insertion order (oldest added first)
+   266→        return arr;
+   267→      case "newest":
+   268→        // reverse insertion order (newest added first)
+   269→        return arr.reverse();
+   270→      case "alpha":
+   271→        return arr.sort((a, b) => a.title.localeCompare(b.title));
+   272→      case "modified":
+   273→        // by reminder time (HH:mm) ascending
+   274→        return arr.sort((a, b) => a.time.localeCompare(b.time));
+   275→      default:
+   276→        return arr;
+   277→    }
+   278→  }, [activeReminders, sort]);
+   279→
+   280→  const sel = useSelection(sorted);
+   281→
+   282→  const handleSwipeDelete = (r: Reminder) => {
+   283→    // Permanent delete after confirm — reminders are easily recreated, no undo.
+   284→    setConfirmSingle(r);
+   285→  };
+   286→
+   287→  const confirmSingleDelete = () => {
+   288→    if (confirmSingle) {
+   289→      deleteReminder(confirmSingle.id);
+   290→      toast({ title: "Reminder deleted" });
+   291→    }
+   292→    setConfirmSingle(undefined);
+   293→  };
+   294→
+   295→  const handleBulkDelete = () => {
+   296→    if (sel.selected.length === 0) return;
+   297→    setConfirmBulk(true);
+   298→  };
+   299→
+   300→  const confirmBulkDelete = () => {
+   301→    bulkDeleteReminders(sel.selected);
+   302→    sel.clearAll();
+   303→    setConfirmBulk(false);
+   304→    toast({
+   305→      title: `${sel.selected.length} reminders deleted`,
+   306→    });
+   307→  };
+   308→
+   309→  return (
+   310→    <div className="space-y-4">
+   311→      <div className="flex items-center justify-between gap-3">
+   312→        <p className="text-body text-text-secondary">
+   313→          {activeReminders.length}{" "}
+   314→          {activeReminders.length === 1 ? "reminder" : "reminders"}
+   315→        </p>
+   316→        <div className="flex items-center gap-2">
+   317→          <SortMenu value={sort} onChange={setSort} />
+   318→          <Pressable
+   319→            onClick={() => {
+   320→              setEditing(undefined);
+   321→              setFormOpen(true);
+   322→            }}
+   323→            className="px-4 py-2 rounded-full gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center gap-1.5 shrink-0"
+   324→          >
+   325→            <Plus size={15} />
+   326→            New
+   327→          </Pressable>
+   328→        </div>
+   329→      </div>
+   330→
+   331→      {sorted.length === 0 ? (
+   332→        <EmptyState
+   333→          emoji="🔔"
+   334→          title="No reminders yet"
+   335→          description="Add gentle nudges for water, medication, skincare or anything you'd like to remember."
+   336→          action={
+   337→            <Pressable
+   338→              onClick={() => {
+   339→                setEditing(undefined);
+   340→                setFormOpen(true);
+   341→              }}
+   342→              className="px-5 py-2.5 rounded-full gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center gap-1.5"
+   343→            >
+   344→              <Plus size={15} />
+   345→              Add reminder
+   346→            </Pressable>
+   347→          }
+   348→        />
+   349→      ) : (
+   350→        /* Timeline */
+   351→        <div className="relative pl-6">
+   352→          {/* timeline rail */}
+   353→          <div className="absolute left-[10px] top-2 bottom-2 w-0.5 bg-divider" />
+   354→          <div className="space-y-3">
+   355→            <AnimatePresence initial={false}>
+   356→              {sorted.map((r, i) => (
+   357→                <motion.div
+   358→                  key={r.id}
+   359→                  layout
+   360→                  initial={{ opacity: 0, x: 16 }}
+   361→                  animate={{ opacity: 1, x: 0 }}
+   362→                  exit={{ opacity: 0, x: -16, height: 0 }}
+   363→                  transition={{ duration: 0.3 }}
+   364→                  className="relative"
+   365→                >
+   366→                  {/* node */}
+   367→                  <div
+   368→                    className={cn(
+   369→                      "absolute -left-[18px] top-5 w-4 h-4 rounded-full border-2 border-background z-10",
+   370→                      r.enabled ? "gradient-primary-bg" : "bg-surface-secondary"
+   371→                    )}
+   372→                  />
+   373→                  <SwipeableRow
+   374→                    onDelete={() => handleSwipeDelete(r)}
+   375→                    disabled={sel.mode}
+   376→                  >
+   377→                    <ReminderRow
+   378→                      reminder={r}
+   379→                      selected={sel.isSelected(r.id)}
+   380→                      inSelectionMode={sel.mode}
+   381→                      onTap={() => {
+   382→                        if (sel.mode) sel.toggle(r.id);
+   383→                        else {
+   384→                          setEditing(r.id);
+   385→                          setFormOpen(true);
+   386→                        }
+   387→                      }}
+   388→                      onLongPress={() => sel.enterMode(r.id)}
+   389→                      onToggleEnabled={() =>
+   390→                        updateReminder(r.id, { enabled: !r.enabled })
+   391→                      }
+   392→                    />
+   393→                  </SwipeableRow>
+   394→                </motion.div>
+   395→              ))}
+   396→            </AnimatePresence>
+   397→          </div>
+   398→        </div>
+   399→      )}
+   400→
+   401→      <ReminderForm
+   402→        open={formOpen}
+   403→        onOpenChange={setFormOpen}
+   404→        existing={editingReminder}
+   405→        onSave={(r) => {
+   406→          if (editingReminder) updateReminder(editingReminder.id, r);
+   407→          else addReminder(r);
+   408→        }}
+   409→        onDelete={deleteReminder}
+   410→      />
+   411→
+   412→      {/* Selection bar — portaled to body */}
+   413→      <Portal>
+   414→        <SelectionBar
+   415→          selectedCount={sel.selectedCount}
+   416→          onCancel={sel.clearAll}
+   417→          onDelete={handleBulkDelete}
+   418→          onSelectAll={sel.selectAll}
+   419→          total={sorted.length}
+   420→        />
+   421→      </Portal>
+   422→
+   423→      {/* Confirm single delete */}
+   424→      <Portal>
+   425→        <ConfirmDialog
+   426→          open={!!confirmSingle}
+   427→          onOpenChange={(v) => {
+   428→            if (!v) setConfirmSingle(undefined);
+   429→          }}
+   430→          title="Delete this reminder?"
+   431→          description="This cannot be undone, but you can always recreate it."
+   432→          confirmLabel="Delete"
+   433→          variant="destructive"
+   434→          onConfirm={confirmSingleDelete}
+   435→        />
+   436→      </Portal>
+   437→
+   438→      {/* Confirm bulk delete */}
+   439→      <Portal>
+   440→        <ConfirmDialog
+   441→          open={confirmBulk}
+   442→          onOpenChange={setConfirmBulk}
+   443→          title={
+   444→            sel.selectedCount > 1
+   445→              ? `Delete ${sel.selectedCount} reminders?`
+   446→              : "Delete this reminder?"
+   447→          }
+   448→          description="This cannot be undone, but you can always recreate them."
+   449→          confirmLabel="Delete"
+   450→          variant="destructive"
+   451→          onConfirm={confirmBulkDelete}
+   452→        />
+   453→      </Portal>
+   454→    </div>
+   455→  );
+   456→}
+   457→
+   458→function ReminderRow({
+   459→  reminder,
+   460→  selected,
+   461→  inSelectionMode,
+   462→  onTap,
+   463→  onLongPress,
+   464→  onToggleEnabled,
+   465→}: {
+   466→  reminder: Reminder;
+   467→  selected: boolean;
+   468→  inSelectionMode: boolean;
+   469→  onTap: () => void;
+   470→  onLongPress: () => void;
+   471→  onToggleEnabled: () => void;
+   472→}) {
+   473→  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+   474→  const longPressedRef = React.useRef(false);
+   475→
+   476→  const startPress = () => {
+   477→    longPressedRef.current = false;
+   478→    timerRef.current = setTimeout(() => {
+   479→      longPressedRef.current = true;
+   480→      onLongPress();
+   481→    }, 450);
+   482→  };
+   483→  const cancelPress = () => {
+   484→    if (timerRef.current) {
+   485→      clearTimeout(timerRef.current);
+   486→      timerRef.current = null;
+   487→    }
+   488→  };
+   489→  React.useEffect(() => () => cancelPress(), []);
+   490→
+   491→  const handleClick = () => {
+   492→    if (longPressedRef.current) {
+   493→      longPressedRef.current = false;
+   494→      return;
+   495→    }
+   496→    onTap();
+   497→  };
+   498→
+   499→  return (
+   500→    <button
+   501→      type="button"
+   502→      onPointerDown={startPress}
+   503→      onPointerUp={cancelPress}
+   504→      onPointerMove={cancelPress}
+   505→      onPointerLeave={cancelPress}
+   506→      onPointerCancel={cancelPress}
+   507→      onClick={handleClick}
+   508→      className="block w-full text-left select-none"
+   509→      aria-pressed={selected}
+   510→    >
+   511→      <SurfaceCard
+   512→        className={cn(
+   513→          "p-4 transition-shadow",
+   514→          !reminder.enabled && "opacity-60",
+   515→          selected && "ring-2 ring-inset ring-primary"
+   516→        )}
+   517→      >
+   518→        <div className="flex items-center gap-3">
+   519→          <div className="w-11 h-11 rounded-2xl bg-surface-secondary flex items-center justify-center text-xl shrink-0">
+   520→            {REMINDER_CATEGORIES.find((c) => c.id === reminder.category)?.emoji}
+   521→          </div>
+   522→          <div className="flex-1 min-w-0">
+   523→            <p className="text-title text-text-primary truncate">
+   524→              {reminder.title}
+   525→            </p>
+   526→            <div className="flex items-center gap-1.5 text-caption text-text-secondary mt-0.5">
+   527→              <Clock size={12} />
+   528→              {formatTime(reminder.time)}
+   529→            </div>
+   530→            <div className="flex gap-1 mt-2">
+   531→              {WEEKDAY_LABELS.map((d, idx) => (
+   532→                <span
+   533→                  key={idx}
+   534→                  className={cn(
+   535→                    "text-[10px] font-bold w-4 h-4 rounded flex items-center justify-center",
+   536→                    reminder.days[idx] ? "text-primary" : "text-text-tertiary"
+   537→                  )}
+   538→                >
+   539→                  {d}
+   540→                </span>
+   541→              ))}
+   542→            </div>
+   543→          </div>
+   544→          {/* toggle (hidden in selection mode) */}
+   545→          {inSelectionMode ? (
+   546→            <div
+   547→              className={cn(
+   548→                "w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0 transition-colors",
+   549→                selected
+   550→                  ? "gradient-primary-bg border-transparent"
+   551→                  : "border-border bg-surface"
+   552→              )}
+   553→              aria-hidden
+   554→            >
+   555→              {selected && <Check size={15} className="text-primary-foreground" />}
+   556→            </div>
+   557→          ) : (
+   558→            <button
+   559→              onClick={(e) => {
+   560→                e.stopPropagation();
+   561→                onToggleEnabled();
+   562→              }}
+   563→              className={cn(
+   564→                "relative w-12 h-7 rounded-full transition-colors shrink-0",
+   565→                reminder.enabled ? "gradient-primary-bg" : "bg-border"
+   566→              )}
+   567→              aria-label={reminder.enabled ? "Disable" : "Enable"}
+   568→            >
+   569→              <motion.span
+   570→                layout
+   571→                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+   572→                className={cn(
+   573→                  "absolute top-1 w-5 h-5 rounded-full bg-white shadow-md",
+   574→                  reminder.enabled ? "left-6" : "left-1"
+   575→                )}
+   576→              />
+   577→            </button>
+   578→          )}
+   579→        </div>
+   580→      </SurfaceCard>
+   581→    </button>
+   582→  );
+   583→}
+   584→
+   585→/* ============== ARCHIVE TAB ============== */
+   586→function ArchiveTab() {
+   587→  const {
+   588→    cycleEntries,
+   589→    journalEntries,
+   590→    wishlistItems,
+   591→    reminders,
+   592→    archiveCycleEntry,
+   593→    deleteCycleEntry,
+   594→    archiveJournalEntry,
+   595→    deleteJournalEntry,
+   596→    archiveWishlistItem,
+   597→    deleteWishlistItem,
+   598→    archiveReminder,
+   599→    deleteReminder,
+   600→  } = useStore();
+   601→
+   602→  const [confirmDelete, setConfirmDelete] = React.useState<{
+   603→    open: boolean;
+   604→    type: "cycle" | "journal" | "wishlist" | "reminder";
+   605→    id: string;
+   606→  } | null>(null);
+   607→  const [confirmEmptyAll, setConfirmEmptyAll] = React.useState(false);
+   608→
+   609→  const archivedCycles = cycleEntries.filter((e) => e.archived);
+   610→  const archivedJournals = journalEntries.filter((e) => e.archived);
+   611→  const archivedWishlist = wishlistItems.filter((e) => e.archived);
+   612→  const archivedReminders = reminders.filter((e) => e.archived);
+   613→
+   614→  const sections = [
+   615→    { type: "cycle" as const, label: "Cycle entries", emoji: "🌸", items: archivedCycles },
+   616→    { type: "journal" as const, label: "Journal entries", emoji: "📔", items: archivedJournals },
+   617→    { type: "wishlist" as const, label: "Wishlist items", emoji: "🛍️", items: archivedWishlist },
+   618→    { type: "reminder" as const, label: "Reminders", emoji: "🔔", items: archivedReminders },
+   619→  ].filter((s) => s.items.length > 0);
+   620→
+   621→  const totalCount =
+   622→    archivedCycles.length +
+   623→    archivedJournals.length +
+   624→    archivedWishlist.length +
+   625→    archivedReminders.length;
+   626→
+   627→  const handleRestore = (
+   628→    type: "cycle" | "journal" | "wishlist" | "reminder",
+   629→    id: string
+   630→  ) => {
+   631→    switch (type) {
+   632→      case "cycle":
+   633→        archiveCycleEntry(id, false);
+   634→        break;
+   635→      case "journal":
+   636→        archiveJournalEntry(id, false);
+   637→        break;
+   638→      case "wishlist":
+   639→        archiveWishlistItem(id, false);
+   640→        break;
+   641→      case "reminder":
+   642→        archiveReminder(id, false);
+   643→        break;
+   644→    }
+   645→    toast({ title: "Restored" });
+   646→  };
+   647→
+   648→  const handlePermanentDelete = (
+   649→    type: "cycle" | "journal" | "wishlist" | "reminder",
+   650→    id: string
+   651→  ) => {
+   652→    setConfirmDelete({ open: true, type, id });
+   653→  };
+   654→
+   655→  const confirmDeleteAction = () => {
+   656→    if (!confirmDelete) return;
+   657→    const { type, id } = confirmDelete;
+   658→    switch (type) {
+   659→      case "cycle":
+   660→        deleteCycleEntry(id);
+   661→        break;
+   662→      case "journal":
+   663→        deleteJournalEntry(id);
+   664→        break;
+   665→      case "wishlist":
+   666→        deleteWishlistItem(id);
+   667→        break;
+   668→      case "reminder":
+   669→        deleteReminder(id);
+   670→        break;
+   671→    }
+   672→    setConfirmDelete(null);
+   673→    toast({ title: "Permanently deleted" });
+   674→  };
+   675→
+   676→  const handleEmptyAll = () => {
+   677→    setConfirmEmptyAll(true);
+   678→  };
+   679→
+   680→  const confirmEmptyAllAction = () => {
+   681→    archivedCycles.forEach((e) => deleteCycleEntry(e.id));
+   682→    archivedJournals.forEach((e) => deleteJournalEntry(e.id));
+   683→    archivedWishlist.forEach((e) => deleteWishlistItem(e.id));
+   684→    archivedReminders.forEach((e) => deleteReminder(e.id));
+   685→    setConfirmEmptyAll(false);
+   686→    toast({ title: "Archive emptied" });
+   687→  };
+   688→
+   689→  if (totalCount === 0) {
+   690→    return (
+   691→      <EmptyState
+   692→        emoji="🗂️"
+   693→        title="Nothing archived"
+   694→        description="Archived items rest here until you restore or delete them."
+   695→      />
+   696→    );
+   697→  }
+   698→
+   699→  return (
+   700→    <div className="space-y-5">
+   701→      <div className="flex items-center justify-between">
+   702→        <p className="text-body text-text-secondary">
+   703→          {totalCount} archived {totalCount === 1 ? "item" : "items"}
+   704→        </p>
+   705→      </div>
+   706→
+   707→      {sections.map((section, sIdx) => (
+   708→        <StaggerItem key={section.type} index={sIdx}>
+   709→          <SurfaceCard className="p-5">
+   710→            <SectionHeader
+   711→              title={section.label}
+   712→              subtitle={`${section.items.length} archived`}
+   713→              className="mb-4"
+   714→            />
+   715→            <div className="space-y-2">
+   716→              <AnimatePresence initial={false}>
+   717→                {section.items.map((item) => (
+   718→                  <motion.div
+   719→                    key={item.id}
+   720→                    layout
+   721→                    initial={{ opacity: 0, y: 8 }}
+   722→                    animate={{ opacity: 1, y: 0 }}
+   723→                    exit={{ opacity: 0, x: -16, height: 0, marginBottom: 0 }}
+   724→                    transition={{ duration: 0.25 }}
+   725→                  >
+   726→                    <ArchivedItemRow
+   727→                      type={section.type}
+   728→                      item={item}
+   729→                      onRestore={() => handleRestore(section.type, item.id)}
+   730→                      onDelete={() =>
+   731→                        handlePermanentDelete(section.type, item.id)
+   732→                      }
+   733→                    />
+   734→                  </motion.div>
+   735→                ))}
+   736→              </AnimatePresence>
+   737→            </div>
+   738→          </SurfaceCard>
+   739→        </StaggerItem>
+   740→      ))}
+   741→
+   742→      {/* Empty archive button */}
+   743→      <StaggerItem index={sections.length}>
+   744→        <SurfaceCard className="p-5 border-error/20">
+   745→          <div className="flex items-center gap-3 mb-3">
+   746→            <div className="w-11 h-11 rounded-2xl bg-error/10 flex items-center justify-center">
+   747→              <Trash2 size={18} className="text-error" />
+   748→            </div>
+   749→            <div>
+   750→              <p className="text-title text-text-primary">Empty archive</p>
+   751→              <p className="text-caption text-text-secondary">
+   752→                Permanently delete all {totalCount} archived items
+   753→              </p>
+   754→            </div>
+   755→          </div>
+   756→          <Pressable
+   757→            onClick={handleEmptyAll}
+   758→            className="w-full py-3 rounded-2xl border border-error/30 text-error text-sm font-semibold flex items-center justify-center gap-2"
+   759→          >
+   760→            <Trash2 size={16} />
+   761→            Empty archive
+   762→          </Pressable>
+   763→        </SurfaceCard>
+   764→      </StaggerItem>
+   765→
+   766→      {/* Confirm single permanent delete */}
+   767→      <Portal>
+   768→        <ConfirmDialog
+   769→          open={!!confirmDelete}
+   770→          onOpenChange={(v) => {
+   771→            if (!v) setConfirmDelete(null);
+   772→          }}
+   773→          title="Delete permanently?"
+   774→          description="This item will be gone for good. This cannot be undone."
+   775→          confirmLabel="Delete"
+   776→          variant="destructive"
+   777→          onConfirm={confirmDeleteAction}
+   778→        />
+   779→      </Portal>
+   780→
+   781→      {/* Confirm empty all */}
+   782→      <Portal>
+   783→        <ConfirmDialog
+   784→          open={confirmEmptyAll}
+   785→          onOpenChange={setConfirmEmptyAll}
+   786→          title={`Delete all ${totalCount} archived items?`}
+   787→          description="This will permanently remove every archived item across your app. This cannot be undone."
+   788→          confirmLabel="Empty archive"
+   789→          variant="destructive"
+   790→          onConfirm={confirmEmptyAllAction}
+   791→        />
+   792→      </Portal>
+   793→    </div>
+   794→  );
+   795→}
+   796→
+   797→function ArchivedItemRow({
+   798→  type,
+   799→  item,
+   800→  onRestore,
+   801→  onDelete,
+   802→}: {
+   803→  type: "cycle" | "journal" | "wishlist" | "reminder";
+   804→  item: CycleEntry | JournalEntry | WishlistItem | Reminder;
+   805→  onRestore: () => void;
+   806→  onDelete: () => void;
+   807→}) {
+   808→  // Derive title/description and archived-ago text per type
+   809→  let title = "";
+   810→  let subtitle = "";
+   811→  let emoji = "";
+   812→  let icon: React.ComponentType<{ size?: number; className?: string }> = Sparkles;
+   813→
+   814→  const archivedAt =
+   815→    (item as { archivedAt?: string }).archivedAt ??
+   816→    (item as { date?: string }).date ??
+   817→    "";
+   818→
+   819→  if (type === "cycle") {
+   820→    const e = item as CycleEntry;
+   821→    title = e.date;
+   822→    subtitle = e.isPeriod
+   823→      ? `Period · ${e.flow ?? "light"} flow`
+   824→      : e.symptoms.length > 0
+   825→      ? `${e.symptoms.length} symptom${e.symptoms.length === 1 ? "" : "s"}`
+   826→      : "Symptoms only";
+   827→    emoji = "🌸";
+   828→    icon = Droplet;
+   829→  } else if (type === "journal") {
+   830→    const e = item as JournalEntry;
+   831→    title = e.title;
+   832→    subtitle = e.reflection.slice(0, 60) + (e.reflection.length > 60 ? "…" : "");
+   833→    emoji = "📔";
+   834→    icon = BookHeart;
+   835→  } else if (type === "wishlist") {
+   836→    const e = item as WishlistItem;
+   837→    title = e.title;
+   838→    subtitle = e.description || "No description";
+   839→    emoji = "🛍️";
+   840→    icon = ShoppingBag;
+   841→  } else {
+   842→    const e = item as Reminder;
+   843→    title = e.title;
+   844→    subtitle = `${formatTime(e.time)} · ${
+   845→      REMINDER_CATEGORIES.find((c) => c.id === e.category)?.label ?? "Reminder"
+   846→    }`;
+   847→    emoji = "🔔";
+   848→    icon = Bell;
+   849→  }
+   850→
+   851→  return (
+   852→    <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-secondary">
+   853→      <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-xl shrink-0">
+   854→        {emoji}
+   855→      </div>
+   856→      <div className="flex-1 min-w-0">
+   857→        <p className="text-body text-text-primary font-semibold truncate">
+   858→          {title}
+   859→        </p>
+   860→        <p className="text-caption text-text-secondary truncate mt-0.5">
+   861→          {subtitle}
+   862→        </p>
+   863→        <p className="text-label text-text-tertiary mt-1">
+   864→          archived {archivedAt ? archivedAgo(archivedAt) : "earlier"}
+   865→        </p>
+   866→      </div>
+   867→      <div className="flex flex-col gap-1.5 shrink-0">
+   868→        <Pressable
+   869→          onClick={onRestore}
+   870→          className="px-3 py-1.5 rounded-xl bg-surface border border-border text-primary text-caption font-semibold flex items-center gap-1"
+   871→        >
+   872→          <ArchiveRestore size={13} />
+   873→          Restore
+   874→        </Pressable>
+   875→        <Pressable
+   876→          onClick={onDelete}
+   877→          className="px-3 py-1.5 rounded-xl border border-error/30 text-error text-caption font-semibold flex items-center gap-1"
+   878→        >
+   879→          <Trash2 size={13} />
+   880→          Delete
+   881→        </Pressable>
+   882→      </div>
+   883→    </div>
+   884→  );
+   885→}
+   886→
+   887→function archivedAgo(iso: string): string {
+   888→  try {
+   889→    const then = new Date(iso).getTime();
+   890→    const now = Date.now();
+   891→    const diff = now - then;
+   892→    const m = Math.floor(diff / 60000);
+   893→    if (m < 1) return "just now";
+   894→    if (m < 60) return `${m}m ago`;
+   895→    const h = Math.floor(m / 60);
+   896→    if (h < 24) return `${h}h ago`;
+   897→    const d = Math.floor(h / 24);
+   898→    if (d === 1) return "1d ago";
+   899→    if (d < 7) return `${d}d ago`;
+   900→    const w = Math.floor(d / 7);
+   901→    if (w === 1) return "1w ago";
+   902→    if (w < 5) return `${w}w ago`;
+   903→    return new Date(iso).toLocaleDateString();
+   904→  } catch {
+   905→    return "earlier";
+   906→  }
+   907→}
+   908→
+   909→/* ============== BACKUP TAB ============== */
+   910→function BackupTab() {
+   911→  const { exportData, importData, resetAll } = useStore();
+   912→  const [importOpen, setImportOpen] = React.useState(false);
+   913→  const [importText, setImportText] = React.useState("");
+   914→
+   915→  const doExport = () => {
+   916→    const data = exportData();
+   917→    downloadJson(
+   918→      data,
+   919→      `abantika-backup-${new Date().toISOString().split("T")[0]}.json`
+   920→    );
+   921→    toast({ title: "Backup exported", description: "Your data has been saved." });
+   922→  };
+   923→
+   924→  const doImport = () => {
+   925→    const ok = importData(importText);
+   926→    if (ok) {
+   927→      toast({ title: "Backup restored", description: "Welcome back." });
+   928→      setImportOpen(false);
+   929→      setImportText("");
+   930→    } else {
+   931→      toast({
+   932→        title: "Import failed",
+   933→        description: "That doesn't look like a valid backup.",
+   934→        variant: "destructive",
+   935→      });
+   936→    }
+   937→  };
+   938→
+   939→  const doReset = () => {
+   940→    if (confirm("Reset all data? This cannot be undone.")) {
+   941→      resetAll();
+   942→      toast({ title: "Data reset", description: "Starting fresh." });
+   943→    }
+   944→  };
+   945→
+   946→  return (
+   947→    <div className="space-y-4">
+   948→      {/* Privacy banner */}
+   949→      <SurfaceCard className="p-4 flex items-start gap-3">
+   950→        <div className="w-10 h-10 rounded-2xl bg-success/15 flex items-center justify-center shrink-0">
+   951→          <Shield size={18} className="text-success" />
+   952→        </div>
+   953→        <div>
+   954→          <p className="text-title text-text-primary">Private by design</p>
+   955→          <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+   956→            Everything stays on this device. No accounts, no servers, no tracking.
+   957→          </p>
+   958→        </div>
+   959→      </SurfaceCard>
+   960→
+   961→      {/* Export */}
+   962→      <StaggerItem index={0}>
+   963→        <SurfaceCard className="p-5">
+   964→          <div className="flex items-center gap-3 mb-3">
+   965→            <IconBadge icon={Download} variant="solid" size={44} />
+   966→            <div>
+   967→              <p className="text-title text-text-primary">Export backup</p>
+   968→              <p className="text-caption text-text-secondary">
+   969→                Save a JSON file of all your data
+   970→              </p>
+   971→            </div>
+   972→          </div>
+   973→          <Pressable
+   974→            onClick={doExport}
+   975→            className="w-full py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow flex items-center justify-center gap-2"
+   976→          >
+   977→            <Download size={16} />
+   978→            Download backup
+   979→          </Pressable>
+   980→        </SurfaceCard>
+   981→      </StaggerItem>
+   982→
+   983→      {/* Import */}
+   984→      <StaggerItem index={1}>
+   985→        <SurfaceCard className="p-5">
+   986→          <div className="flex items-center gap-3 mb-3">
+   987→            <IconBadge icon={Upload} variant="soft" size={44} />
+   988→            <div>
+   989→              <p className="text-title text-text-primary">Restore backup</p>
+   990→              <p className="text-caption text-text-secondary">
+   991→                Paste a previously exported JSON
+   992→              </p>
+   993→            </div>
+   994→          </div>
+   995→          <Pressable
+   996→            onClick={() => setImportOpen(true)}
+   997→            className="w-full py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border flex items-center justify-center gap-2"
+   998→          >
+   999→            <Upload size={16} />
+  1000→            Paste &amp; restore
+  1001→          </Pressable>
+  1002→        </SurfaceCard>
+  1003→      </StaggerItem>
+  1004→
+  1005→      {/* Danger zone */}
+  1006→      <StaggerItem index={2}>
+  1007→        <SurfaceCard className="p-5 border-error/20">
+  1008→          <div className="flex items-center gap-3 mb-3">
+  1009→            <div className="w-11 h-11 rounded-2xl bg-error/10 flex items-center justify-center">
+  1010→              <Trash2 size={18} className="text-error" />
+  1011→            </div>
+  1012→            <div>
+  1013→              <p className="text-title text-text-primary">Reset everything</p>
+  1014→              <p className="text-caption text-text-secondary">
+  1015→                Permanently clear all your data
+  1016→              </p>
+  1017→            </div>
+  1018→          </div>
+  1019→          <Pressable
+  1020→            onClick={doReset}
+  1021→            className="w-full py-3 rounded-2xl border border-error/30 text-error text-sm font-semibold flex items-center justify-center gap-2"
+  1022→          >
+  1023→            <Trash2 size={16} />
+  1024→            Reset all data
+  1025→          </Pressable>
+  1026→        </SurfaceCard>
+  1027→      </StaggerItem>
+  1028→
+  1029→      {/* Import dialog */}
+  1030→      <AnimatePresence>
+  1031→        {importOpen && (
+  1032→          <motion.div
+  1033→            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4"
+  1034→            initial={{ opacity: 0 }}
+  1035→            animate={{ opacity: 1 }}
+  1036→            exit={{ opacity: 0 }}
+  1037→          >
+  1038→            <div
+  1039→              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+  1040→              onClick={() => setImportOpen(false)}
+  1041→            />
+  1042→            <motion.div
+  1043→              initial={{ y: 60, opacity: 0 }}
+  1044→              animate={{ y: 0, opacity: 1 }}
+  1045→              exit={{ y: 40, opacity: 0 }}
+  1046→              transition={{ type: "spring", stiffness: 320, damping: 30 }}
+  1047→              className="relative w-full max-w-md rounded-[28px] surface-elevated p-6"
+  1048→            >
+  1049→              <div className="flex items-center justify-between mb-3">
+  1050→                <h2 className="text-headline text-text-primary">Restore data</h2>
+  1051→                <button
+  1052→                  onClick={() => setImportOpen(false)}
+  1053→                  className="w-9 h-9 rounded-full bg-surface-secondary flex items-center justify-center"
+  1054→                >
+  1055→                  <Plus size={18} className="rotate-45 text-text-secondary" />
+  1056→                </button>
+  1057→              </div>
+  1058→              <p className="text-caption text-text-secondary mb-3">
+  1059→                Paste your backup JSON below.
+  1060→              </p>
+  1061→              <textarea
+  1062→                value={importText}
+  1063→                onChange={(e) => setImportText(e.target.value)}
+  1064→                rows={6}
+  1065→                placeholder='{"hydration": …}'
+  1066→                className="w-full rounded-2xl bg-surface-secondary border border-border p-4 text-caption font-mono text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/40 resize-none"
+  1067→              />
+  1068→              <div className="flex gap-3 mt-4">
+  1069→                <button
+  1070→                  onClick={() => setImportOpen(false)}
+  1071→                  className="flex-1 py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border"
+  1072→                >
+  1073→                  Cancel
+  1074→                </button>
+  1075→                <button
+  1076→                  onClick={doImport}
+  1077→                  className="flex-1 py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow"
+  1078→                >
+  1079→                  Restore
+  1080→                </button>
+  1081→              </div>
+  1082→            </motion.div>
+  1083→          </motion.div>
+  1084→        )}
+  1085→      </AnimatePresence>
+  1086→    </div>
+  1087→  );
+  1088→}
+  1089→
+  1090→/* ==================== PORTAL ==================== */
+  1091→function Portal({ children }: { children: React.ReactNode }) {
+  1092→  // useSyncExternalStore avoids setState-in-effect and is SSR-safe:
+  1093→  const mounted = React.useSyncExternalStore(
+  1094→    () => () => {},
+  1095→    () => true,
+  1096→    () => false
+  1097→  );
+  1098→  if (!mounted) return null;
+  1099→  return createPortal(children, document.body);
+  1100→}
+  1101→

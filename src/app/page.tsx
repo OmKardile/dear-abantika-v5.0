@@ -8,6 +8,7 @@ import { CycleTracker } from "@/components/pages/cycle-tracker";
 import { Journal } from "@/components/pages/journal";
 import { Hydration } from "@/components/pages/hydration";
 import { Settings } from "@/components/pages/settings";
+import { Reminders } from "@/components/pages/reminders";
 import { useHydrated } from "@/lib/store";
 
 export default function Home() {
@@ -45,6 +46,7 @@ export default function Home() {
         {tab === "cycle" && <CycleTracker />}
         {tab === "journal" && <Journal />}
         {tab === "hydration" && <Hydration />}
+        {tab === "reminders" && <Reminders />}
         {tab === "settings" && <Settings />}
       </AppShell>
     </div>

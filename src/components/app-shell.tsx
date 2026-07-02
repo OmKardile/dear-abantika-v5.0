@@ -7,19 +7,27 @@ import {
   Flower2,
   BookHeart,
   Droplet,
+  Bell,
   Settings,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/premium/primitives";
 
-export type TabId = "home" | "cycle" | "journal" | "hydration" | "settings";
+export type TabId =
+  | "home"
+  | "cycle"
+  | "journal"
+  | "hydration"
+  | "reminders"
+  | "settings";
 
 const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "cycle", label: "Cycle", icon: Flower2 },
   { id: "journal", label: "Journal", icon: BookHeart },
   { id: "hydration", label: "Water", icon: Droplet },
+  { id: "reminders", label: "Reminders", icon: Bell },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -39,7 +47,7 @@ function BottomNav({
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
         className="pointer-events-auto w-full max-w-md"
       >
-        <div className="relative rounded-[28px] px-2 py-2 shadow-lifted border border-border glass">
+        <div className="relative rounded-[28px] px-1.5 py-1.5 shadow-lifted border border-border glass">
           <div className="flex items-center justify-between">
             {TABS.map((tab) => {
               const isActive = active === tab.id;
@@ -50,7 +58,7 @@ function BottomNav({
                   onClick={() => onChange(tab.id)}
                   aria-label={tab.label}
                   aria-current={isActive ? "page" : undefined}
-                  className="relative flex flex-1 flex-col items-center gap-1 py-2 px-1 rounded-[22px] transition-colors"
+                  className="relative flex flex-1 flex-col items-center gap-0.5 py-1.5 px-0.5 rounded-[22px] transition-colors"
                 >
                   {isActive && (
                     <motion.div
@@ -59,13 +67,13 @@ function BottomNav({
                       transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
                   )}
-                  <div className="relative z-10 flex flex-col items-center gap-1">
+                  <div className="relative z-10 flex flex-col items-center gap-0.5">
                     <motion.div
                       animate={isActive ? { scale: 1, y: 0 } : { scale: 0.92, y: 0 }}
                       transition={{ type: "spring", stiffness: 400, damping: 25 }}
                     >
                       <Icon
-                        size={22}
+                        size={20}
                         strokeWidth={isActive ? 2.6 : 2}
                         className={cn(
                           "transition-colors",
@@ -77,7 +85,7 @@ function BottomNav({
                     </motion.div>
                     <span
                       className={cn(
-                        "text-[10px] font-semibold tracking-wide transition-colors",
+                        "text-[9px] font-semibold tracking-wide transition-colors",
                         isActive
                           ? "text-primary-foreground"
                           : "text-text-tertiary"

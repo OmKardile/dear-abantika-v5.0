@@ -1,21 +1,18 @@
 "use client";
 
 import * as React from "react";
+import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Droplet,
   Smile,
   Flower2,
   Bell,
-  Sparkles,
-  ChevronRight,
   Flame,
   Waves,
-  Quote,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { greeting, greetingSub, formatTime, timeUntil } from "@/lib/helpers";
-import { MOODS } from "@/lib/types";
+import { greeting, greetingSub, formatTime } from "@/lib/helpers";
 import {
   SurfaceCard,
   IconBadge,
@@ -75,10 +72,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
     const map = new Map(hydration.history.map((h) => [h.date, h.amount]));
     let s = 0;
     const d = new Date();
-    // today counts if current > 0
     const todayKey = d.toISOString().split("T")[0];
     if (hydration.current > 0 || map.has(todayKey)) {
-      // walk back from today
       let cur = new Date(d);
       while (true) {
         const key = cur.toISOString().split("T")[0];
@@ -92,6 +87,29 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
     return s;
   }, [hydration]);
 
+  // cycle subtitle: "~N days away" when a period entry exists, else entries count / "Begin tracking"
+  const cycleSubtitle = React.useMemo(() => {
+    const periods = cycleEntries.filter((e) => e.isPeriod);
+    if (periods.length === 0) {
+      return cycleEntries.length > 0
+        ? `${cycleEntries.length} ${cycleEntries.length === 1 ? "entry" : "entries"}`
+        : "Begin tracking";
+    }
+    const sorted = [...periods].sort((a, b) => a.date.localeCompare(b.date));
+    const last = sorted[sorted.length - 1].date;
+    const lastDate = new Date(last + "T00:00:00");
+    const next = new Date(lastDate);
+    next.setDate(next.getDate() + 28);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.round(
+      (next.getTime() - today.getTime()) / 86_400_000
+    );
+    if (days > 0) return `~${days} days away`;
+    if (days === 0) return "due today";
+    return `${cycleEntries.length} entries`;
+  }, [cycleEntries]);
+
   const quickActions = [
     {
       label: "Log Water",
@@ -102,38 +120,38 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
     {
       label: "Log Mood",
       icon: Smile,
-      tint: "var(--chart-1)",
+      tint: "var(--chart-4)",
       action: () => setMoodOpen(true),
     },
     {
       label: "Cycle",
       icon: Flower2,
-      tint: "var(--chart-3)",
+      tint: "var(--primary)",
       action: () => onNavigate("cycle"),
     },
     {
-      label: "Reminder",
+      label: "Reminders",
       icon: Bell,
-      tint: "var(--chart-4)",
-      action: () => onNavigate("settings"),
+      tint: "var(--chart-3)",
+      action: () => onNavigate("reminders"),
     },
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ===== Hero Greeting ===== */}
       <motion.div
         initial={reduce ? { opacity: 0 } : { opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[28px] p-6 pb-7 text-primary-foreground gradient-primary-bg shadow-glow"
+        className="relative overflow-hidden rounded-[28px] p-5 pb-5 text-primary-foreground gradient-primary-bg shadow-glow"
       >
         {/* floating decorative orbs */}
-        <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/15 blur-2xl" />
-        <div className="absolute -bottom-12 -left-10 w-44 h-44 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full bg-white/15 blur-2xl" />
+        <div className="absolute -bottom-12 -left-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
         <motion.div
           aria-hidden
-          className="absolute right-5 top-5 text-3xl"
+          className="absolute right-4 top-4 text-2xl"
           animate={reduce ? undefined : { rotate: [0, 8, -8, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         >
@@ -144,58 +162,55 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
           <p className="text-label text-primary-foreground/80">
             {greeting()}
           </p>
+          <p className="text-[11px] font-medium text-primary-foreground/55 mt-0.5">
+            {format(new Date(), "EEEE, MMMM d")}
+          </p>
           <h1 className="text-display mt-1">
             Hello, <span className="italic">Abantika</span>
           </h1>
-          <p className="text-body text-primary-foreground/85 mt-2 max-w-[18rem]">
+          <p className="text-sm text-primary-foreground/85 mt-1.5 max-w-[18rem]">
             {greetingSub()}
           </p>
 
-          {/* mini stats row */}
-          <div className="mt-5 flex items-center gap-4">
+          {/* mini stats row — compact, 2 stats */}
+          <div className="mt-3.5 flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-primary-foreground/90">
-              <Flame size={16} className="text-primary-foreground" />
-              <span className="text-sm font-semibold">{streak}</span>
-              <span className="text-xs text-primary-foreground/70">day streak</span>
+              <Flame size={14} className="text-primary-foreground" />
+              <span className="text-xs font-bold tabular-nums">{streak}</span>
+              <span className="text-[10px] text-primary-foreground/70">streak</span>
             </div>
-            <div className="w-px h-4 bg-primary-foreground/30" />
+            <div className="w-px h-3 bg-primary-foreground/30" />
             <div className="flex items-center gap-1.5 text-primary-foreground/90">
-              <Droplet size={16} />
-              <span className="text-sm font-semibold">
+              <Droplet size={14} />
+              <span className="text-xs font-bold tabular-nums">
                 {Math.round(hydrationPct)}%
               </span>
-              <span className="text-xs text-primary-foreground/70">hydrated</span>
-            </div>
-            <div className="w-px h-4 bg-primary-foreground/30" />
-            <div className="flex items-center gap-1.5 text-primary-foreground/90">
-              <Flower2 size={16} />
-              <span className="text-sm font-semibold">{cycleEntries.length}</span>
-              <span className="text-xs text-primary-foreground/70">entries</span>
+              <span className="text-[10px] text-primary-foreground/70">water</span>
             </div>
           </div>
         </div>
       </motion.div>
 
       {/* ===== Floating Quick Actions ===== */}
-      <div className="grid grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-4 gap-2">
         {quickActions.map((a, i) => {
           const Icon = a.icon;
           return (
             <StaggerItem key={a.label} index={i}>
               <Pressable
                 onClick={a.action}
-                className="w-full flex flex-col items-center gap-2.5 p-3.5 rounded-[22px] surface-card active:scale-95"
+                className="w-full flex flex-col items-center gap-1.5 p-2.5 rounded-[18px] surface-card active:scale-95"
               >
                 <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  className="w-11 h-11 rounded-2xl flex items-center justify-center"
                   style={{
                     backgroundColor: `${a.tint}1a`,
                     backgroundImage: `linear-gradient(135deg, ${a.tint}26, ${a.tint}0d)`,
                   }}
                 >
-                  <Icon size={24} style={{ color: a.tint }} strokeWidth={2.2} />
+                  <Icon size={20} style={{ color: a.tint }} strokeWidth={2.2} />
                 </div>
-                <span className="text-[11px] font-semibold text-text-primary leading-tight text-center">
+                <span className="text-[10px] font-semibold text-text-primary leading-tight text-center">
                   {a.label}
                 </span>
               </Pressable>
@@ -204,14 +219,14 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
         })}
       </div>
 
-      {/* ===== Animated Wave Hydration Card ===== */}
+      {/* ===== Compact Wave Hydration Card ===== */}
       <StaggerItem index={1}>
-        <SurfaceCard className="relative overflow-hidden p-5">
-          <div className="flex items-start justify-between mb-4">
+        <SurfaceCard className="relative overflow-hidden p-4">
+          <div className="flex items-start justify-between mb-3">
             <div>
               <p className="text-label text-text-tertiary">Hydration</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-headline text-text-primary">
+                <span className="text-xl font-bold text-text-primary tabular-nums">
                   <AnimatedCounter value={hydration.current} />ml
                 </span>
                 <span className="text-caption text-text-secondary">
@@ -219,11 +234,11 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
                 </span>
               </div>
             </div>
-            <IconBadge icon={Droplet} variant="solid" size={44} />
+            <IconBadge icon={Droplet} variant="solid" size={36} />
           </div>
 
           {/* Wave progress */}
-          <div className="relative h-16 rounded-2xl overflow-hidden bg-surface-secondary">
+          <div className="relative h-14 rounded-2xl overflow-hidden bg-surface-secondary">
             {/* vibrant fill */}
             <motion.div
               className="absolute inset-y-0 left-0"
@@ -255,13 +270,13 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
                 }}
               />
             </motion.div>
-            <div className="relative h-full flex items-center justify-between px-4">
-              <span className="text-sm font-bold text-primary-foreground drop-shadow-sm">
+            <div className="relative h-full flex items-center justify-between px-3.5">
+              <span className="text-xs font-bold text-primary-foreground drop-shadow-sm">
                 {Math.round(hydrationPct)}%
               </span>
               <div className="flex items-center gap-1.5 text-primary-foreground/90">
-                <Waves size={14} />
-                <span className="text-xs font-medium">
+                <Waves size={13} />
+                <span className="text-[11px] font-medium">
                   {hydrationPct >= 100
                     ? "Goal complete!"
                     : `${hydration.goal - hydration.current}ml to go`}
@@ -270,16 +285,16 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
             </div>
           </div>
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-3 flex gap-2">
             <Pressable
               onClick={() => addWater(250)}
-              className="flex-1 py-2.5 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center justify-center gap-1.5"
+              className="flex-1 py-2 rounded-2xl gradient-primary-bg text-primary-foreground text-xs font-semibold shadow-glow flex items-center justify-center"
             >
               +250ml
             </Pressable>
             <Pressable
               onClick={() => addWater(500)}
-              className="flex-1 py-2.5 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border flex items-center justify-center gap-1.5"
+              className="flex-1 py-2 rounded-2xl bg-surface-secondary text-text-primary text-xs font-semibold border border-border flex items-center justify-center"
             >
               +500ml
             </Pressable>
@@ -287,120 +302,146 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
         </SurfaceCard>
       </StaggerItem>
 
-      {/* ===== Mood + Reminder cards ===== */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* ===== 2x2 Status Grid ===== */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Mood (top-left) */}
         <StaggerItem index={2}>
           <Pressable
             onClick={() => setMoodOpen(true)}
             className="w-full text-left h-full"
           >
-            <SurfaceCard className="p-5 h-full flex flex-col justify-between min-h-[140px]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-label text-text-tertiary">Mood</p>
-                  <p className="text-caption text-text-secondary mt-0.5">
-                    Today
-                  </p>
-                </div>
-                <motion.div
-                  animate={
-                    reduce
-                      ? undefined
-                      : { y: [0, -4, 0], rotate: [0, 6, -6, 0] }
-                  }
-                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="text-4xl"
-                >
-                  {mood.current}
-                </motion.div>
+            <SurfaceCard className="p-4 h-full flex flex-col justify-between min-h-[110px]">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "var(--chart-4)" }}
+                />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Mood
+                </span>
               </div>
-              <div className="flex items-center gap-1 text-primary text-xs font-semibold mt-3">
-                <Smile size={13} />
-                Tap to update
-              </div>
+              <motion.div
+                animate={
+                  reduce
+                    ? undefined
+                    : { y: [0, -4, 0], rotate: [0, 6, -6, 0] }
+                }
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                className="text-3xl text-center my-1"
+              >
+                {mood.current}
+              </motion.div>
+              <p className="text-[11px] text-text-secondary text-center">Today</p>
             </SurfaceCard>
           </Pressable>
         </StaggerItem>
 
+        {/* Cycle (top-right) */}
         <StaggerItem index={3}>
           <Pressable
-            onClick={() => onNavigate("settings")}
+            onClick={() => onNavigate("cycle")}
             className="w-full text-left h-full"
           >
-            <SurfaceCard className="p-5 h-full flex flex-col justify-between min-h-[140px]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-label text-text-tertiary">Next up</p>
-                  <p className="text-title text-text-primary mt-0.5 line-clamp-1">
-                    {nextReminder ? nextReminder.title : "No reminders"}
-                  </p>
-                </div>
-                <IconBadge icon={Bell} variant="soft" size={40} />
+            <SurfaceCard className="p-4 h-full flex flex-col justify-between min-h-[110px]">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "var(--primary)" }}
+                />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Cycle
+                </span>
               </div>
-              {nextReminder ? (
-                <div className="mt-3">
-                  <p className="text-sm font-bold text-primary">
-                    {timeUntil(nextReminder.time)}
-                  </p>
-                  <p className="text-caption text-text-secondary">
-                    {formatTime(nextReminder.time)}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-caption text-text-secondary mt-3">
-                  Add one in settings
-                </p>
-              )}
+              <div className="flex items-center justify-center my-1">
+                <Flower2 size={28} className="text-primary" strokeWidth={2} />
+              </div>
+              <p className="text-[11px] text-text-secondary text-center truncate">
+                {cycleSubtitle}
+              </p>
+            </SurfaceCard>
+          </Pressable>
+        </StaggerItem>
+
+        {/* Streak (bottom-left) */}
+        <StaggerItem index={4}>
+          <SurfaceCard className="p-4 h-full flex flex-col justify-between min-h-[110px]">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: "var(--chart-4)" }}
+              />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                Streak
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 my-1">
+              <Flame size={18} className="text-primary" />
+              <span className="text-2xl font-extrabold text-text-primary tabular-nums leading-none">
+                <AnimatedCounter value={streak} />
+              </span>
+            </div>
+            <p className="text-[11px] text-text-secondary text-center">
+              days consistent
+            </p>
+          </SurfaceCard>
+        </StaggerItem>
+
+        {/* Next (bottom-right) */}
+        <StaggerItem index={5}>
+          <Pressable
+            onClick={() => onNavigate("reminders")}
+            className="w-full text-left h-full"
+          >
+            <SurfaceCard className="p-4 h-full flex flex-col justify-between min-h-[110px]">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "var(--chart-3)" }}
+                />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Next
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-text-primary text-center my-1 line-clamp-2 leading-tight">
+                {nextReminder ? nextReminder.title : "No alerts"}
+              </p>
+              <p className="text-[11px] text-text-secondary text-center">
+                {nextReminder ? formatTime(nextReminder.time) : "Set one up"}
+              </p>
             </SurfaceCard>
           </Pressable>
         </StaggerItem>
       </div>
 
-      {/* ===== Cycle status ===== */}
-      <StaggerItem index={4}>
-        <Pressable
-          onClick={() => onNavigate("cycle")}
-          className="w-full text-left"
-        >
-          <SurfaceCard className="p-5 flex items-center gap-4">
-            <IconBadge icon={Flower2} variant="solid" size={48} />
-            <div className="flex-1 min-w-0">
-              <p className="text-label text-text-tertiary">Cycle</p>
-              <p className="text-title text-text-primary truncate">
-                {cycleEntries.length > 0
-                  ? `${cycleEntries.length} entries logged`
-                  : "Begin tracking"}
-              </p>
-              <p className="text-caption text-text-secondary truncate">
-                {cycleEntries.length > 0
-                  ? "Tap to view calendar & insights"
-                  : "Gentle, private logging awaits"}
-              </p>
-            </div>
-            <ChevronRight size={20} className="text-text-tertiary shrink-0" />
-          </SurfaceCard>
-        </Pressable>
-      </StaggerItem>
-
-      {/* ===== Daily encouragement ===== */}
-      <StaggerItem index={5}>
-        <SurfaceCard className="relative overflow-hidden p-6">
+      {/* ===== Daily Reflection ===== */}
+      <StaggerItem index={6}>
+        <SurfaceCard className="relative overflow-hidden p-5 text-center">
           <div
             aria-hidden
             className="absolute -right-8 -top-8 w-32 h-32 rounded-full opacity-20 blur-2xl"
             style={{ background: "var(--chart-3)" }}
           />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-3">
-              <IconBadge icon={Sparkles} variant="glass" size={36} />
-              <p className="text-label text-text-tertiary">Daily encouragement</p>
-            </div>
-            <Quote
-              size={20}
-              className="text-primary/40 mb-2"
-              strokeWidth={2.4}
-            />
-            <p className="text-body text-text-primary leading-relaxed">
+          <div
+            aria-hidden
+            className="absolute -left-8 -bottom-8 w-28 h-28 rounded-full opacity-15 blur-2xl"
+            style={{ background: "var(--chart-4)" }}
+          />
+          <div className="relative flex flex-col items-center">
+            <motion.div
+              animate={
+                reduce
+                  ? undefined
+                  : { y: [0, -4, 0], rotate: [0, 5, -5, 0] }
+              }
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="text-4xl mb-2.5"
+            >
+              🌸
+            </motion.div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2">
+              Daily Reflection
+            </p>
+            <p className="text-sm text-text-primary leading-relaxed max-w-[20rem]">
               {TIPS[tipIdx]}
             </p>
             <div className="mt-4 flex items-center gap-2">
@@ -408,7 +449,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
                 <button
                   key={i}
                   onClick={() => setTipIdx(i)}
-                  aria-label={`Tip ${i + 1}`}
+                  aria-label={`Reflection ${i + 1}`}
                   className="h-1.5 rounded-full transition-all"
                   style={{
                     width: i === tipIdx ? 22 : 6,
