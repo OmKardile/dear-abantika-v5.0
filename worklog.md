@@ -312,3 +312,21 @@ Stage Summary:
 - Reminders promoted to main bottom-nav tab (6 tabs total, compact for mobile)
 - Dashboard redesigned per attached design: faded date, 2x2 status grid, daily reflection card, compact sizing
 - Mobile responsiveness confirmed at 360px width across all tabs
+
+---
+Task ID: v3-fixes
+Agent: main (orchestrator)
+Task: Fix button-nesting hydration error + theme color switching + version bump to 3.0
+
+Work Log:
+- Fixed button-in-button nesting in reminders.tsx: changed outer <button> to <div role="button" tabIndex={0}> with onKeyDown handler for accessibility, allowing inner toggle <button> to be valid HTML
+- Diagnosed theme color issue: Tailwind v4/Lightning CSS had stale Turbopack cache (.next) that didn't include the 8 new theme CSS blocks — compiled CSS only had 7 original themes. Fixed by clearing .next cache (rm -rf .next) + clean dev server restart. Verified all 15 themes now present in compiled CSS.
+- Verified theme switching works LIVE (no reload needed): Indigo Night bg changed from lab(98.26) to lab(4.35) instantly, Coral and Sunset also switch correctly
+- Updated version to 3.0: layout.tsx metadata (generator + other.version), settings.tsx About card "Version 3.0 · Premium", package.json "3.0.0"
+- Verified: 0 console errors on Reminders tab (button nesting fixed), 0 lint errors, all 15 themes switch live
+
+Stage Summary:
+- Button nesting hydration error: FIXED (outer button → div[role=button])
+- Theme colors not changing: FIXED (cleared stale .next cache; all 15 themes now compile and apply live)
+- Version: bumped to 3.0 in metadata, settings about card, and package.json
+- No other changes made — rest of app untouched as requested

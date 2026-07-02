@@ -298,15 +298,22 @@ function ReminderRow({
   };
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onPointerDown={startPress}
       onPointerUp={cancelPress}
       onPointerMove={cancelPress}
       onPointerLeave={cancelPress}
       onPointerCancel={cancelPress}
       onClick={handleClick}
-      className="block w-full text-left select-none"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onTap();
+        }
+      }}
+      className="block w-full text-left select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-[24px]"
       aria-pressed={selected}
     >
       <SurfaceCard
@@ -379,7 +386,7 @@ function ReminderRow({
           )}
         </div>
       </SurfaceCard>
-    </button>
+    </div>
   );
 }
 

@@ -28,6 +28,9 @@ export const metadata: Metadata = {
     "mindfulness",
   ],
   authors: [{ name: "Abantika" }],
+  applicationName: "Abantika",
+  generator: "Abantika v3.0",
+  other: { version: "3.0" },
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
