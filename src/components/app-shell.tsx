@@ -31,24 +31,77 @@ const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-function BottomNav({
+/**
+ * Strict separated layout:
+ * - Top status-bar safe spacing
+ * - Scrollable content area (the "content box")
+ * - Solid (non-floating, non-transparent) bottom nav fixed at the bottom
+ * Content never overlaps the nav. The nav has its own opaque surface.
+ */
+export function AppShell({
   active,
   onChange,
+  children,
 }: {
   active: TabId;
   onChange: (t: TabId) => void;
+  children: React.ReactNode;
 }) {
   const reduce = useReducedMotion();
+  // CSS variable for the nav height, exposed so FABs/overlays can position above it.
+  // 6 items at ~56px tall + 8px top padding + safe-area bottom.
+  const NAV_HEIGHT = "4rem"; // 64px solid bar
+  const NAV_TOTAL = `calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))`;
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center pb-[max(env(safe-area-inset-bottom),12px)] px-3">
+    <div
+      className="relative flex min-h-[100dvh] w-full flex-col items-center gradient-hero-bg"
+      style={{ "--nav-h": NAV_TOTAL } as React.CSSProperties}
+    >
+      {/* Ambient decorative blobs (fixed, behind everything) */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 overflow-hidden"
+      >
+        <div
+          className="absolute -top-24 -right-16 w-72 h-72 rounded-full opacity-[0.16] blur-3xl"
+          style={{ background: "var(--chart-1)" }}
+        />
+        <div
+          className="absolute top-1/3 -left-20 w-64 h-64 rounded-full opacity-[0.10] blur-3xl"
+          style={{ background: "var(--chart-3)" }}
+        />
+      </div>
+
+      {/* ===== Content box: scrollable, strictly above the nav ===== */}
+      <main
+        className="relative z-10 w-full max-w-md flex-1 overflow-y-auto scroll-area"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)",
+          paddingBottom: "calc(var(--nav-h) + 0.75rem)",
+          minHeight: "100dvh",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div className="px-4">
+          <PageTransition id={active}>{children}</PageTransition>
+        </div>
+      </main>
+
+      {/* ===== Solid bottom navigation (NOT floating, NOT transparent) ===== */}
       <motion.nav
         initial={reduce ? false : { y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-        className="pointer-events-auto w-full max-w-md"
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Primary"
       >
-        <div className="relative rounded-[28px] px-1.5 py-1.5 shadow-lifted border border-border glass">
-          <div className="flex items-center justify-between">
+        <div className="border-t border-border bg-elevated shadow-lifted">
+          <div
+            className="flex items-stretch justify-between px-2"
+            style={{ height: NAV_HEIGHT }}
+          >
             {TABS.map((tab) => {
               const isActive = active === tab.id;
               const Icon = tab.icon;
@@ -58,18 +111,20 @@ function BottomNav({
                   onClick={() => onChange(tab.id)}
                   aria-label={tab.label}
                   aria-current={isActive ? "page" : undefined}
-                  className="relative flex flex-1 flex-col items-center gap-0.5 py-1.5 px-0.5 rounded-[22px] transition-colors"
+                  className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-colors"
                 >
                   {isActive && (
                     <motion.div
                       layoutId="nav-active"
-                      className="absolute inset-0 rounded-[22px] gradient-primary-bg shadow-glow"
+                      className="absolute inset-1 rounded-2xl gradient-primary-bg shadow-glow"
                       transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
                   )}
-                  <div className="relative z-10 flex flex-col items-center gap-0.5">
+                  <div className="relative z-10 flex flex-col items-center gap-1">
                     <motion.div
-                      animate={isActive ? { scale: 1, y: 0 } : { scale: 0.92, y: 0 }}
+                      animate={
+                        isActive ? { scale: 1, y: 0 } : { scale: 0.9, y: 0 }
+                      }
                       transition={{ type: "spring", stiffness: 400, damping: 25 }}
                     >
                       <Icon
@@ -100,40 +155,6 @@ function BottomNav({
           </div>
         </div>
       </motion.nav>
-    </div>
-  );
-}
-
-export function AppShell({
-  active,
-  onChange,
-  children,
-}: {
-  active: TabId;
-  onChange: (t: TabId) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative min-h-[100dvh] w-full flex justify-center gradient-hero-bg">
-      {/* Ambient decorative blobs */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-      >
-        <div className="absolute -top-24 -right-16 w-72 h-72 rounded-full opacity-[0.18] blur-3xl"
-          style={{ background: "var(--chart-1)" }} />
-        <div className="absolute top-1/3 -left-20 w-64 h-64 rounded-full opacity-[0.12] blur-3xl"
-          style={{ background: "var(--chart-3)" }} />
-      </div>
-
-      {/* Mobile-first column. Full width on phones, centered phone frame on larger screens. */}
-      <main className="relative w-full max-w-md min-h-[100dvh] bg-transparent">
-        <div className="relative z-10 px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(11rem+env(safe-area-inset-bottom))]">
-          <PageTransition id={active}>{children}</PageTransition>
-        </div>
-      </main>
-
-      <BottomNav active={active} onChange={onChange} />
     </div>
   );
 }

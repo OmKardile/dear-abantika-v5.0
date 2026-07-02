@@ -670,7 +670,8 @@ function CycleListView({
             onClick={onAddNew}
             whileTap={{ scale: 0.9 }}
             whileHover={{ scale: 1.05 }}
-            className="fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
+            style={{ bottom: "calc(var(--nav-h, 4rem) + 0.75rem)" }}
+            className="fixed right-4 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
             aria-label="Add cycle entry"
           >
             <Plus size={24} />

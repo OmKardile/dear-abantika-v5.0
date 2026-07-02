@@ -323,7 +323,8 @@ function Diary() {
             onClick={openNew}
             whileTap={{ scale: 0.9 }}
             whileHover={{ scale: 1.05 }}
-            className="fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
+            style={{ bottom: "calc(var(--nav-h, 4rem) + 0.75rem)" }}
+            className="fixed right-4 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
             aria-label="Add journal entry"
           >
             <Plus size={24} />
@@ -595,7 +596,8 @@ function Wishlist() {
             onClick={openNew}
             whileTap={{ scale: 0.9 }}
             whileHover={{ scale: 1.05 }}
-            className="fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
+            style={{ bottom: "calc(var(--nav-h, 4rem) + 0.75rem)" }}
+            className="fixed right-4 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
             aria-label="Add wishlist item"
           >
             <Plus size={24} />

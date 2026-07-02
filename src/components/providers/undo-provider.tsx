@@ -35,7 +35,7 @@ export function UndoProvider({ children }: { children: React.ReactNode }) {
   return (
     <UndoContext.Provider value={{ showUndo }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-28 z-[120] flex flex-col items-center gap-2 px-4">
+      <div className="pointer-events-none fixed inset-x-0 z-[120] flex flex-col items-center gap-2 px-4" style={{ bottom: "calc(var(--nav-h, 4rem) + 0.75rem)" }}>
         <AnimatePresence>
           {items.map((item) => (
             <motion.div

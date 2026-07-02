@@ -353,3 +353,26 @@ Stage Summary:
 - Mobile spacing: improved top + bottom padding with safe-area-aware calc values
 - Elegant fonts: Playfair Display serif on hero greeting, section headers, daily reflection
 - Version: 3.1 in metadata, settings about card, package.json
+
+---
+Task ID: v3.2-no-overlap
+Agent: main (orchestrator)
+Task: Remove all nav/content overlap — solid bottom nav, strict content box, no floating/transparent nav
+
+Work Log:
+- Rebuilt app-shell.tsx with strict separated layout:
+  - Content area is a scrollable <main> with paddingTop (safe-area-inset-top + 0.75rem) and paddingBottom (var(--nav-h) + 0.75rem) — content never goes under nav
+  - Bottom nav is now a SOLID bar (border-t + bg-elevated + shadow-lifted), NOT floating, NOT transparent, NOT glass — sits fixed at bottom with its own opaque surface
+  - Removed the floating rounded glass pill nav; replaced with a full-width solid bar pinned to bottom
+  - Exposed --nav-h CSS variable (4rem + safe-area-inset-bottom) so FABs/overlays can position above the nav
+- Updated all 3 FABs (journal diary, journal wishlist, cycle list): changed from fixed bottom-28/7.5rem to inline style bottom: calc(var(--nav-h, 4rem) + 0.75rem) — FABs now sit clearly above the solid nav with consistent gap
+- Updated UndoProvider snackbar: bottom: calc(var(--nav-h, 4rem) + 0.75rem) so undo toasts don't overlap nav
+- Verified across all 6 tabs: element behind nav center is always the nav's own DIV (not page content) — nav is fully opaque, zero content bleed-through
+- VLM: 8/10 "bottom nav is a clean solid bar separate from content, hero below status bar, no overlap"
+
+Stage Summary:
+- Nav/content overlap: ELIMINATED — nav is a solid opaque bar, content scrolls in its own box above it
+- Hero/status bar overlap: fixed (safe-area-inset-top padding)
+- FAB/nav collision: fixed (FABs use --nav-h variable to sit above nav)
+- Undo snackbar: repositioned above nav
+- No transparent/floating nav effects — clean separation as requested
