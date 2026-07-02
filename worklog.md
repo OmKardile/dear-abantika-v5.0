@@ -330,3 +330,26 @@ Stage Summary:
 - Theme colors not changing: FIXED (cleared stale .next cache; all 15 themes now compile and apply live)
 - Version: bumped to 3.0 in metadata, settings about card, and package.json
 - No other changes made — rest of app untouched as requested
+
+---
+Task ID: v3.1-mobile-fixes
+Agent: main (orchestrator)
+Task: Fix FAB/nav collision, hero/status bar overlap, mobile spacing, add elegant serif fonts, version 3.1
+
+Work Log:
+- Fixed FAB collision with bottom nav: changed all 3 FABs (journal diary, journal wishlist, cycle list) from `fixed bottom-28 right-5` to `fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4` — verified 47px gap between FAB bottom and nav top (was ~23px before, now clearly separated)
+- Fixed hero going into status bar: changed app-shell main content padding from `pt-6` to `pt-[calc(1.5rem+env(safe-area-inset-top))]` — on mobile devices with notch/status bar, the hero now starts below the safe area
+- Increased bottom content padding from `pb-40` to `pb-[calc(11rem+env(safe-area-inset-bottom))]` to ensure all content clears both the nav and FAB
+- Added Playfair Display serif font (weights 500/600/700, normal+italic) via next/font/google in layout.tsx
+- Added elegant typography utilities in globals.css: `.text-display-serif`, `.text-headline-serif`, `.font-serif`, `.tracking-elegant`
+- Applied serif font to: hero greeting "Hello, Abantika" (text-display-serif), all page section headers (text-headline-serif via SectionHeader primitive), Daily Reflection tip text (font-serif italic), greeting label (tracking-elegant)
+- Updated version to 3.1: layout.tsx metadata (generator + other.version), settings.tsx About card "Version 3.1 · Premium", package.json "3.1.0"
+- Verified: 0 console errors, 0 lint errors, FAB gap = 47px, hero starts below status bar, serif font confirmed via getComputedStyle (Playfair Display)
+- VLM: 8/10 "clean, cohesive design"
+
+Stage Summary:
+- FAB/nav collision: FIXED (47px clear gap with safe-area-aware positioning)
+- Hero/status bar overlap: FIXED (safe-area-inset-top padding)
+- Mobile spacing: improved top + bottom padding with safe-area-aware calc values
+- Elegant fonts: Playfair Display serif on hero greeting, section headers, daily reflection
+- Version: 3.1 in metadata, settings about card, package.json

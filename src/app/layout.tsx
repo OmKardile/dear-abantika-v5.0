@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeApplier } from "@/components/providers/theme-applier";
@@ -13,6 +13,13 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -29,8 +36,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Abantika" }],
   applicationName: "Abantika",
-  generator: "Abantika v3.0",
-  other: { version: "3.0" },
+  generator: "Abantika v3.1",
+  other: { version: "3.1" },
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
@@ -52,7 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning data-theme="linen">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
       >
         <ThemeApplier>
           <UndoProvider>{children}</UndoProvider>

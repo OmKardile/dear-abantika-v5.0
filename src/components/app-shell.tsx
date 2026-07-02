@@ -128,7 +128,7 @@ export function AppShell({
 
       {/* Mobile-first column. Full width on phones, centered phone frame on larger screens. */}
       <main className="relative w-full max-w-md min-h-[100dvh] bg-transparent">
-        <div className="relative z-10 px-4 pt-6 pb-40">
+        <div className="relative z-10 px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(11rem+env(safe-area-inset-bottom))]">
           <PageTransition id={active}>{children}</PageTransition>
         </div>
       </main>

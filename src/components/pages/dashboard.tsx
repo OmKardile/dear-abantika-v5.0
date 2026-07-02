@@ -159,13 +159,13 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
         </motion.div>
 
         <div className="relative">
-          <p className="text-label text-primary-foreground/80">
+          <p className="text-label text-primary-foreground/80 tracking-elegant">
             {greeting()}
           </p>
           <p className="text-[11px] font-medium text-primary-foreground/55 mt-0.5">
             {format(new Date(), "EEEE, MMMM d")}
           </p>
-          <h1 className="text-display mt-1">
+          <h1 className="text-display-serif mt-1">
             Hello, <span className="italic">Abantika</span>
           </h1>
           <p className="text-sm text-primary-foreground/85 mt-1.5 max-w-[18rem]">
@@ -438,10 +438,10 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
             >
               🌸
             </motion.div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-elegant text-text-tertiary mb-2">
               Daily Reflection
             </p>
-            <p className="text-sm text-text-primary leading-relaxed max-w-[20rem]">
+            <p className="font-serif text-base text-text-primary leading-relaxed max-w-[20rem] italic">
               {TIPS[tipIdx]}
             </p>
             <div className="mt-4 flex items-center gap-2">
