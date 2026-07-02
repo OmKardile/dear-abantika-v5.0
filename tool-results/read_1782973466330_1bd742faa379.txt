@@ -1,0 +1,857 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import * as React from "react";
+     4→     4→import { useState, useEffect, useRef, useMemo } from "react";
+     5→     5→import { createPortal } from "react-dom";
+     6→     6→import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+     7→     7→import {
+     8→     8→  ChevronLeft,
+     9→     9→  ChevronRight,
+    10→    10→  TrendingUp,
+    11→    11→  CalendarDays,
+    12→    12→  Sparkles,
+    13→    13→  Droplet,
+    14→    14→  Search,
+    15→    15→  List as ListIcon,
+    16→    16→  Check,
+    17→    17→  Plus,
+    18→    18→} from "lucide-react";
+    19→    19→import {
+    20→    20→  format,
+    21→    21→  startOfMonth,
+    22→    22→  endOfMonth,
+    23→    23→  eachDayOfInterval,
+    24→    24→  isSameDay,
+    25→    25→  addMonths,
+    26→    26→  subMonths,
+    27→    27→  startOfWeek,
+    28→    28→  endOfWeek,
+    29→    29→  isSameMonth,
+    30→    30→  isToday,
+    31→    31→} from "date-fns";
+    32→    32→import { useStore } from "@/lib/store";
+    33→    33→import { dateKey } from "@/lib/helpers";
+    34→    34→import { cn } from "@/lib/utils";
+    35→    35→import type { CycleEntry, SortOption } from "@/lib/types";
+    36→    36→import {
+    37→    37→  SurfaceCard,
+    38→    38→  SectionHeader,
+    39→    39→  IconBadge,
+    40→    40→  EmptyState,
+    41→    41→  AnimatedCounter,
+    42→    42→  StaggerItem,
+    43→    43→  Pressable,
+    44→    44→  Chip,
+    45→    45→} from "@/components/premium/primitives";
+    46→    46→import { SwipeableRow } from "@/components/premium/swipeable-row";
+    47→    47→import { SelectionBar } from "@/components/premium/selection-bar";
+    48→    48→import { SortMenu } from "@/components/premium/sort-menu";
+    49→    49→import { ConfirmDialog } from "@/components/premium/confirm-dialog";
+    50→    50→import { useSelection } from "@/hooks/use-selection";
+    51→    51→import { useUndo } from "@/components/providers/undo-provider";
+    52→    52→import { CycleEntryForm } from "@/components/forms/cycle-entry-form";
+    53→    53→
+    54→    54→const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+    55→    55→
+    56→    56→type CycleFilter = "all" | "period" | "symptoms" | "month";
+    57→    57→const CYCLE_FILTERS: { id: CycleFilter; label: string }[] = [
+    58→    58→  { id: "all", label: "All" },
+    59→    59→  { id: "period", label: "Period days" },
+    60→    60→  { id: "symptoms", label: "Symptoms only" },
+    61→    61→  { id: "month", label: "This month" },
+    62→    62→];
+    63→    63→
+    64→    64→type CycleView = "calendar" | "list" | "insights";
+    65→    65→
+    66→    66→export function CycleTracker() {
+    67→    67→  const reduce = useReducedMotion();
+    68→    68→  const { cycleEntries, addCycleEntry, updateCycleEntry, deleteCycleEntry } =
+    69→    69→    useStore();
+    70→    70→  const [currentDate, setCurrentDate] = useState(new Date());
+    71→    71→  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    72→    72→  const [editingEntry, setEditingEntry] = useState<CycleEntry | undefined>();
+    73→    73→  const [view, setView] = useState<CycleView>("calendar");
+    74→    74→  const [formOpen, setFormOpen] = useState(false);
+    75→    75→
+    76→    76→  const monthStart = startOfMonth(currentDate);
+    77→    77→  const monthEnd = endOfMonth(currentDate);
+    78→    78→  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    79→    79→  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    80→    80→  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+    81→    81→
+    82→    82→  const getEntry = (d: Date) =>
+    83→    83→    cycleEntries.find((e) => isSameDay(new Date(e.date), d));
+    84→    84→
+    85→    85→  const periodDays = cycleEntries.filter((e) => e.isPeriod).length;
+    86→    86→
+    87→    87→  // symptom frequency
+    88→    88→  const symptomCounts = useMemo(() => {
+    89→    89→    const m = new Map<string, number>();
+    90→    90→    cycleEntries.forEach((e) =>
+    91→    91→      e.symptoms.forEach((s) => m.set(s, (m.get(s) ?? 0) + 1))
+    92→    92→    );
+    93→    93→    return Array.from(m.entries())
+    94→    94→      .sort((a, b) => b[1] - a[1])
+    95→    95→      .slice(0, 6);
+    96→    96→  }, [cycleEntries]);
+    97→    97→  const maxCount = symptomCounts[0]?.[1] ?? 1;
+    98→    98→
+    99→    99→  const openNew = (date: Date) => {
+   100→   100→    setSelectedDate(date);
+   101→   101→    setEditingEntry(undefined);
+   102→   102→    setFormOpen(true);
+   103→   103→  };
+   104→   104→
+   105→   105→  const openEdit = (entry: CycleEntry) => {
+   106→   106→    setSelectedDate(new Date(entry.date));
+   107→   107→    setEditingEntry(entry);
+   108→   108→    setFormOpen(true);
+   109→   109→  };
+   110→   110→
+   111→   111→  return (
+   112→   112→    <div className="space-y-6">
+   113→   113→      {/* Header */}
+   114→   114→      <motion.div
+   115→   115→        initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12 }}
+   116→   116→        animate={{ opacity: 1, y: 0 }}
+   117→   117→        transition={{ duration: 0.5 }}
+   118→   118→      >
+   119→   119→        <SectionHeader
+   120→   120→          title="Cycle Tracker"
+   121→   121→          subtitle="Gentle, private insights"
+   122→   122→        />
+   123→   123→      </motion.div>
+   124→   124→
+   125→   125→      {/* 3-way segmented control */}
+   126→   126→      <div className="relative flex p-1 rounded-full surface-card">
+   127→   127→        {(["calendar", "list", "insights"] as const).map((v) => {
+   128→   128→          const active = view === v;
+   129→   129→          return (
+   130→   130→            <button
+   131→   131→              key={v}
+   132→   132→              onClick={() => setView(v)}
+   133→   133→              className="relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold"
+   134→   134→              aria-pressed={active}
+   135→   135→            >
+   136→   136→              {active && (
+   137→   137→                <motion.div
+   138→   138→                  layoutId="cycle-view-tab"
+   139→   139→                  className="absolute inset-0 rounded-full gradient-primary-bg shadow-glow"
+   140→   140→                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+   141→   141→                />
+   142→   142→              )}
+   143→   143→              <span
+   144→   144→                className={cn(
+   145→   145→                  "relative z-10 flex items-center gap-1.5 capitalize",
+   146→   146→                  active ? "text-primary-foreground" : "text-text-secondary"
+   147→   147→                )}
+   148→   148→              >
+   149→   149→                {v === "calendar" && <CalendarDays size={15} />}
+   150→   150→                {v === "list" && <ListIcon size={15} />}
+   151→   151→                {v === "insights" && <TrendingUp size={15} />}
+   152→   152→                {v}
+   153→   153→              </span>
+   154→   154→            </button>
+   155→   155→          );
+   156→   156→        })}
+   157→   157→      </div>
+   158→   158→
+   159→   159→      <AnimatePresence mode="wait">
+   160→   160→        {view === "calendar" && (
+   161→   161→          <motion.div
+   162→   162→            key="calendar"
+   163→   163→            initial={{ opacity: 0, x: -16 }}
+   164→   164→            animate={{ opacity: 1, x: 0 }}
+   165→   165→            exit={{ opacity: 0, x: -16 }}
+   166→   166→            transition={{ duration: 0.3 }}
+   167→   167→            className="space-y-6"
+   168→   168→          >
+   169→   169→            {/* Calendar card */}
+   170→   170→            <SurfaceCard className="p-5">
+   171→   171→              {/* Month nav */}
+   172→   172→              <div className="flex items-center justify-between mb-5">
+   173→   173→                <Pressable
+   174→   174→                  onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+   175→   175→                  className="w-10 h-10 rounded-2xl bg-surface-secondary flex items-center justify-center"
+   176→   176→                >
+   177→   177→                  <ChevronLeft size={18} className="text-text-secondary" />
+   178→   178→                </Pressable>
+   179→   179→                <div className="text-center">
+   180→   180→                  <p className="text-label text-text-tertiary">Month</p>
+   181→   181→                  <p className="text-title text-text-primary">
+   182→   182→                    {format(currentDate, "MMMM yyyy")}
+   183→   183→                  </p>
+   184→   184→                </div>
+   185→   185→                <Pressable
+   186→   186→                  onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+   187→   187→                  className="w-10 h-10 rounded-2xl bg-surface-secondary flex items-center justify-center"
+   188→   188→                >
+   189→   189→                  <ChevronRight size={18} className="text-text-secondary" />
+   190→   190→                </Pressable>
+   191→   191→              </div>
+   192→   192→
+   193→   193→              {/* DOW header */}
+   194→   194→              <div className="grid grid-cols-7 gap-1 mb-2">
+   195→   195→                {DOW.map((d, i) => (
+   196→   196→                  <div
+   197→   197→                    key={i}
+   198→   198→                    className="text-center text-label text-text-tertiary py-1"
+   199→   199→                  >
+   200→   200→                    {d}
+   201→   201→                  </div>
+   202→   202→                ))}
+   203→   203→              </div>
+   204→   204→
+   205→   205→              {/* Day grid */}
+   206→   206→              <div className="grid grid-cols-7 gap-1">
+   207→   207→                {days.map((day, i) => {
+   208→   208→                  const entry = getEntry(day);
+   209→   209→                  const inMonth = isSameMonth(day, currentDate);
+   210→   210→                  const today = isToday(day);
+   211→   211→                  const isSelected = selectedDate && isSameDay(day, selectedDate);
+   212→   212→                  return (
+   213→   213→                    <motion.button
+   214→   214→                      key={i}
+   215→   215→                      whileTap={{ scale: 0.9 }}
+   216→   216→                      onClick={() => {
+   217→   217→                        setSelectedDate(day);
+   218→   218→                        setEditingEntry(getEntry(day));
+   219→   219→                        setFormOpen(true);
+   220→   220→                      }}
+   221→   221→                      className={cnDay({
+   222→   222→                        inMonth,
+   223→   223→                        today,
+   224→   224→                        selected: !!isSelected,
+   225→   225→                        isPeriod: entry?.isPeriod,
+   226→   226→                      })}
+   227→   227→                    >
+   228→   228→                      <span
+   229→   229→                        className={cn(
+   230→   230→                          "relative z-10 text-sm font-semibold",
+   231→   231→                          entry?.isPeriod
+   232→   232→                            ? "text-primary-foreground"
+   233→   233→                            : inMonth
+   234→   234→                            ? "text-text-primary"
+   235→   235→                            : "text-text-tertiary",
+   236→   236→                          today && !entry?.isPeriod && "text-primary"
+   237→   237→                        )}
+   238→   238→                      >
+   239→   239→                        {format(day, "d")}
+   240→   240→                      </span>
+   241→   241→                      {entry && !entry.isPeriod && entry.symptoms.length > 0 && (
+   242→   242→                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+   243→   243→                          {entry.symptoms.slice(0, 3).map((_, idx) => (
+   244→   244→                            <span
+   245→   245→                              key={idx}
+   246→   246→                              className="w-1 h-1 rounded-full bg-chart-3"
+   247→   247→                            />
+   248→   248→                          ))}
+   249→   249→                        </span>
+   250→   250→                      )}
+   251→   251→                      {today && (
+   252→   252→                        <span className="absolute inset-0 rounded-xl ring-2 ring-primary/40 pointer-events-none" />
+   253→   253→                      )}
+   254→   254→                    </motion.button>
+   255→   255→                  );
+   256→   256→                })}
+   257→   257→              </div>
+   258→   258→
+   259→   259→              {/* Legend */}
+   260→   260→              <div className="flex items-center gap-4 mt-5 pt-4 border-t border-divider">
+   261→   261→                <div className="flex items-center gap-1.5">
+   262→   262→                  <span className="w-3 h-3 rounded-full gradient-primary-bg" />
+   263→   263→                  <span className="text-caption text-text-secondary">Period</span>
+   264→   264→                </div>
+   265→   265→                <div className="flex items-center gap-1.5">
+   266→   266→                  <span className="w-1 h-1 rounded-full bg-chart-3" />
+   267→   267→                  <span className="text-caption text-text-secondary">Symptoms</span>
+   268→   268→                </div>
+   269→   269→                <div className="flex items-center gap-1.5 ml-auto">
+   270→   270→                  <CalendarDays size={13} className="text-text-tertiary" />
+   271→   271→                  <span className="text-caption text-text-secondary">
+   272→   272→                    Tap a day to log
+   273→   273→                  </span>
+   274→   274→                </div>
+   275→   275→              </div>
+   276→   276→            </SurfaceCard>
+   277→   277→
+   278→   278→            {/* Quick stats */}
+   279→   279→            <div className="grid grid-cols-2 gap-4">
+   280→   280→              <StaggerItem index={0}>
+   281→   281→                <SurfaceCard className="p-5">
+   282→   282→                  <IconBadge icon={Droplet} variant="solid" size={40} />
+   283→   283→                  <p className="text-headline text-text-primary mt-3">
+   284→   284→                    <AnimatedCounter value={periodDays} />
+   285→   285→                  </p>
+   286→   286→                  <p className="text-caption text-text-secondary">Period days</p>
+   287→   287→                </SurfaceCard>
+   288→   288→              </StaggerItem>
+   289→   289→              <StaggerItem index={1}>
+   290→   290→                <SurfaceCard className="p-5">
+   291→   291→                  <IconBadge icon={Sparkles} variant="soft" size={40} />
+   292→   292→                  <p className="text-headline text-text-primary mt-3">
+   293→   293→                    <AnimatedCounter value={cycleEntries.length} />
+   294→   294→                  </p>
+   295→   295→                  <p className="text-caption text-text-secondary">Total entries</p>
+   296→   296→                </SurfaceCard>
+   297→   297→              </StaggerItem>
+   298→   298→            </div>
+   299→   299→
+   300→   300→            {cycleEntries.length === 0 && (
+   301→   301→              <EmptyState
+   302→   302→                emoji="🌸"
+   303→   303→                title="Start your journey"
+   304→   304→                description="Tap any day on the calendar to log your first entry. Everything stays private on your device."
+   305→   305→              />
+   306→   306→            )}
+   307→   307→          </motion.div>
+   308→   308→        )}
+   309→   309→
+   310→   310→        {view === "list" && (
+   311→   311→          <motion.div
+   312→   312→            key="list"
+   313→   313→            initial={{ opacity: 0 }}
+   314→   314→            animate={{ opacity: 1 }}
+   315→   315→            exit={{ opacity: 0 }}
+   316→   316→            transition={{ duration: 0.25 }}
+   317→   317→          >
+   318→   318→            <CycleListView onEditEntry={openEdit} onAddNew={() => openNew(new Date())} />
+   319→   319→          </motion.div>
+   320→   320→        )}
+   321→   321→
+   322→   322→        {view === "insights" && (
+   323→   323→          <motion.div
+   324→   324→            key="insights"
+   325→   325→            initial={{ opacity: 0, x: 16 }}
+   326→   326→            animate={{ opacity: 1, x: 0 }}
+   327→   327→            exit={{ opacity: 0, x: 16 }}
+   328→   328→            transition={{ duration: 0.3 }}
+   329→   329→            className="space-y-6"
+   330→   330→          >
+   331→   331→            {/* Summary cards */}
+   332→   332→            <div className="grid grid-cols-2 gap-4">
+   333→   333→              <SurfaceCard className="p-5">
+   334→   334→                <p className="text-label text-text-tertiary">Total entries</p>
+   335→   335→                <p className="text-headline text-text-primary mt-1">
+   336→   336→                  <AnimatedCounter value={cycleEntries.length} />
+   337→   337→                </p>
+   338→   338→              </SurfaceCard>
+   339→   339→              <SurfaceCard className="p-5">
+   340→   340→                <p className="text-label text-text-tertiary">Period days</p>
+   341→   341→                <p className="text-headline text-text-primary mt-1">
+   342→   342→                  <AnimatedCounter value={periodDays} />
+   343→   343→                </p>
+   344→   344→              </SurfaceCard>
+   345→   345→            </div>
+   346→   346→
+   347→   347→            {/* Top symptoms */}
+   348→   348→            <SurfaceCard className="p-5">
+   349→   349→              <SectionHeader
+   350→   350→                title="Top symptoms"
+   351→   351→                subtitle="Most logged this period"
+   352→   352→                className="mb-5"
+   353→   353→              />
+   354→   354→              {symptomCounts.length === 0 ? (
+   355→   355→                <EmptyState
+   356→   356→                  emoji="📊"
+   357→   357→                  title="No data yet"
+   358→   358→                  description="Log symptoms with your entries to see patterns here."
+   359→   359→                />
+   360→   360→              ) : (
+   361→   361→                <div className="space-y-3.5">
+   362→   362→                  {symptomCounts.map(([sym, count], i) => (
+   363→   363→                    <StaggerItem key={sym} index={i}>
+   364→   364→                      <div>
+   365→   365→                        <div className="flex items-center justify-between mb-1.5">
+   366→   366→                          <span className="text-body text-text-primary font-medium">
+   367→   367→                            {sym}
+   368→   368→                          </span>
+   369→   369→                          <span className="text-caption text-text-secondary font-semibold">
+   370→   370→                            {count}×
+   371→   371→                          </span>
+   372→   372→                        </div>
+   373→   373→                        <div className="h-2.5 rounded-full bg-surface-secondary overflow-hidden">
+   374→   374→                          <motion.div
+   375→   375→                            className="h-full rounded-full"
+   376→   376→                            style={{
+   377→   377→                              backgroundImage: "var(--gradient-primary)",
+   378→   378→                            }}
+   379→   379→                            initial={reduce ? { width: `${(count / maxCount) * 100}%` } : { width: 0 }}
+   380→   380→                            animate={{ width: `${(count / maxCount) * 100}%` }}
+   381→   381→                            transition={{ duration: 0.9, delay: 0.1 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
+   382→   382→                          />
+   383→   383→                        </div>
+   384→   384→                      </div>
+   385→   385→                    </StaggerItem>
+   386→   386→                  ))}
+   387→   387→                </div>
+   388→   388→              )}
+   389→   389→            </SurfaceCard>
+   390→   390→
+   391→   391→            {/* Recent entries */}
+   392→   392→            {cycleEntries.length > 0 && (
+   393→   393→              <SurfaceCard className="p-5">
+   394→   394→                <SectionHeader
+   395→   395→                  title="Recent entries"
+   396→   396→                  className="mb-4"
+   397→   397→                />
+   398→   398→                <div className="space-y-2.5 max-h-72 overflow-y-auto scroll-area -mr-2 pr-2">
+   399→   399→                  {[...cycleEntries]
+   400→   400→                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+   401→   401→                    .slice(0, 12)
+   402→   402→                    .map((e) => (
+   403→   403→                      <Pressable
+   404→   404→                        key={e.id}
+   405→   405→                        onClick={() => openEdit(e)}
+   406→   406→                        className="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-surface-secondary"
+   407→   407→                      >
+   408→   408→                        <div
+   409→   409→                          className={cn(
+   410→   410→                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+   411→   411→                            e.isPeriod
+   412→   412→                              ? "gradient-primary-bg"
+   413→   413→                              : "bg-surface border border-border"
+   414→   414→                          )}
+   415→   415→                        >
+   416→   416→                          {e.isPeriod ? (
+   417→   417→                            <Droplet size={16} className="text-primary-foreground" />
+   418→   418→                          ) : (
+   419→   419→                            <Sparkles size={16} className="text-text-tertiary" />
+   420→   420→                          )}
+   421→   421→                        </div>
+   422→   422→                        <div className="flex-1 min-w-0">
+   423→   423→                          <p className="text-body text-text-primary font-semibold">
+   424→   424→                            {format(new Date(e.date), "MMM d, yyyy")}
+   425→   425→                          </p>
+   426→   426→                          <p className="text-caption text-text-secondary truncate">
+   427→   427→                            {e.isPeriod
+   428→   428→                              ? `${e.flow ?? "light"} flow`
+   429→   429→                              : "Symptoms only"}
+   430→   430→                            {e.symptoms.length > 0 &&
+   431→   431→                              ` · ${e.symptoms.length} symptoms`}
+   432→   432→                          </p>
+   433→   433→                        </div>
+   434→   434→                      </Pressable>
+   435→   435→                    ))}
+   436→   436→                </div>
+   437→   437→              </SurfaceCard>
+   438→   438→            )}
+   439→   439→          </motion.div>
+   440→   440→        )}
+   441→   441→      </AnimatePresence>
+   442→   442→
+   443→   443→      <CycleEntryForm
+   444→   444→        open={formOpen}
+   445→   445→        onOpenChange={setFormOpen}
+   446→   446→        date={selectedDate ? dateKey(selectedDate) : dateKey(new Date())}
+   447→   447→        existing={editingEntry}
+   448→   448→        onSave={(entry) => {
+   449→   449→          if (editingEntry) updateCycleEntry(editingEntry.id, entry);
+   450→   450→          else addCycleEntry(entry);
+   451→   451→        }}
+   452→   452→        onDelete={deleteCycleEntry}
+   453→   453→      />
+   454→   454→    </div>
+   455→   455→  );
+   456→   456→}
+   457→   457→
+   458→   458→/* ==================== LIST VIEW ==================== */
+   459→   459→function CycleListView({
+   460→   460→  onEditEntry,
+   461→   461→  onAddNew,
+   462→   462→}: {
+   463→   463→  onEditEntry: (entry: CycleEntry) => void;
+   464→   464→  onAddNew: () => void;
+   465→   465→}) {
+   466→   466→  const {
+   467→   467→    cycleEntries,
+   468→   468→    archiveCycleEntry,
+   469→   469→    bulkDeleteCycleEntries,
+   470→   470→    bulkArchiveCycleEntries,
+   471→   471→  } = useStore();
+   472→   472→  const { showUndo } = useUndo();
+   473→   473→
+   474→   474→  const [search, setSearch] = useState("");
+   475→   475→  const [filter, setFilter] = useState<CycleFilter>("all");
+   476→   476→  const [sort, setSort] = useState<SortOption>("newest");
+   477→   477→  const [confirmDelete, setConfirmDelete] = useState<{
+   478→   478→    open: boolean;
+   479→   479→    ids: string[];
+   480→   480→  }>({ open: false, ids: [] });
+   481→   481→
+   482→   482→  // archived entries live in the Archive screen in Settings — hide them here
+   483→   483→  const activeEntries = useMemo(
+   484→   484→    () => cycleEntries.filter((e) => !e.archived),
+   485→   485→    [cycleEntries]
+   486→   486→  );
+   487→   487→
+   488→   488→  const visible = useMemo(() => {
+   489→   489→    const q = search.trim().toLowerCase();
+   490→   490→    const now = new Date();
+   491→   491→    const mStart = startOfMonth(now);
+   492→   492→    const mEnd = endOfMonth(now);
+   493→   493→
+   494→   494→    const filtered = activeEntries.filter((e) => {
+   495→   495→      if (q) {
+   496→   496→        const matches =
+   497→   497→          (e.notes?.toLowerCase().includes(q) ?? false) ||
+   498→   498→          (e.medication?.toLowerCase().includes(q) ?? false) ||
+   499→   499→          (e.flow?.toLowerCase().includes(q) ?? false) ||
+   500→   500→          e.date.toLowerCase().includes(q) ||
+   501→   501→          e.symptoms.some((s) => s.toLowerCase().includes(q));
+   502→   502→        if (!matches) return false;
+   503→   503→      }
+   504→   504→      switch (filter) {
+   505→   505→        case "period":
+   506→   506→          return e.isPeriod;
+   507→   507→        case "symptoms":
+   508→   508→          return !e.isPeriod && e.symptoms.length > 0;
+   509→   509→        case "month": {
+   510→   510→          const d = new Date(e.date);
+   511→   511→          return d >= mStart && d <= mEnd;
+   512→   512→        }
+   513→   513→        default:
+   514→   514→          return true;
+   515→   515→      }
+   516→   516→    });
+   517→   517→
+   518→   518→    return filtered.sort((a, b) => {
+   519→   519→      switch (sort) {
+   520→   520→        case "oldest":
+   521→   521→          return a.date > b.date ? 1 : -1;
+   522→   522→        case "alpha": // by symptom count desc (alpha doesn't fit cycle entries)
+   523→   523→          return b.symptoms.length - a.symptoms.length;
+   524→   524→        case "modified": {
+   525→   525→          const am = a.archivedAt ?? a.date;
+   526→   526→          const bm = b.archivedAt ?? b.date;
+   527→   527→          return am < bm ? 1 : -1;
+   528→   528→        }
+   529→   529→        case "newest":
+   530→   530→        default:
+   531→   531→          return a.date < b.date ? 1 : -1;
+   532→   532→      }
+   533→   533→    });
+   534→   534→  }, [activeEntries, search, filter, sort]);
+   535→   535→
+   536→   536→  const sel = useSelection(visible);
+   537→   537→  const hasAny = activeEntries.length > 0;
+   538→   538→
+   539→   539→  // Swipe "delete" action = soft archive + undo snackbar
+   540→   540→  const handleSwipeDelete = (entry: CycleEntry) => {
+   541→   541→    archiveCycleEntry(entry.id, true);
+   542→   542→    showUndo("Entry archived", () => archiveCycleEntry(entry.id, false));
+   543→   543→  };
+   544→   544→  // Swipe "archive" action = archive (restorable from Settings)
+   545→   545→  const handleSwipeArchive = (entry: CycleEntry, archived: boolean) => {
+   546→   546→    archiveCycleEntry(entry.id, archived);
+   547→   547→  };
+   548→   548→  // Multi-select delete = permanent delete after confirm
+   549→   549→  const handleMultiDelete = () => {
+   550→   550→    if (sel.selected.length === 0) return;
+   551→   551→    setConfirmDelete({ open: true, ids: sel.selected });
+   552→   552→  };
+   553→   553→  const handleMultiArchive = () => {
+   554→   554→    const ids = sel.selected;
+   555→   555→    if (ids.length === 0) return;
+   556→   556→    bulkArchiveCycleEntries(ids, true);
+   557→   557→    sel.clearAll();
+   558→   558→  };
+   559→   559→  const confirmDeleteAction = () => {
+   560→   560→    bulkDeleteCycleEntries(confirmDelete.ids);
+   561→   561→    sel.clearAll();
+   562→   562→    setConfirmDelete({ open: false, ids: [] });
+   563→   563→  };
+   564→   564→
+   565→   565→  return (
+   566→   566→    <div className="space-y-5">
+   567→   567→      {/* Search + sort row */}
+   568→   568→      <div className="flex items-center gap-2">
+   569→   569→        <SurfaceCard className="flex-1 flex items-center gap-3 px-4 py-3 min-w-0">
+   570→   570→          <Search size={18} className="text-text-tertiary shrink-0" />
+   571→   571→          <input
+   572→   572→            value={search}
+   573→   573→            onChange={(e) => setSearch(e.target.value)}
+   574→   574→            placeholder="Search entries…"
+   575→   575→            className="flex-1 bg-transparent outline-none text-body text-text-primary placeholder:text-text-tertiary min-w-0"
+   576→   576→            aria-label="Search cycle entries"
+   577→   577→          />
+   578→   578→          {search && (
+   579→   579→            <button
+   580→   580→              onClick={() => setSearch("")}
+   581→   581→              className="text-caption text-text-tertiary shrink-0 hover:text-text-primary transition-colors"
+   582→   582→              aria-label="Clear search"
+   583→   583→            >
+   584→   584→              Clear
+   585→   585→            </button>
+   586→   586→          )}
+   587→   587→        </SurfaceCard>
+   588→   588→        <SortMenu value={sort} onChange={setSort} />
+   589→   589→      </div>
+   590→   590→
+   591→   591→      {/* Filter chips */}
+   592→   592→      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+   593→   593→        {CYCLE_FILTERS.map((f) => (
+   594→   594→          <Chip
+   595→   595→            key={f.id}
+   596→   596→            active={filter === f.id}
+   597→   597→            onClick={() => setFilter(f.id)}
+   598→   598→          >
+   599→   599→            {f.label}
+   600→   600→          </Chip>
+   601→   601→        ))}
+   602→   602→      </div>
+   603→   603→
+   604→   604→      {/* List or empty state */}
+   605→   605→      {visible.length === 0 ? (
+   606→   606→        <EmptyState
+   607→   607→          emoji="🌸"
+   608→   608→          title={hasAny ? "No matches found" : "Start your journey"}
+   609→   609→          description={
+   610→   610→            hasAny
+   611→   611→              ? "Try a different search or filter to find your entries."
+   612→   612→              : "Log your first cycle entry to begin tracking. Everything stays private on your device."
+   613→   613→          }
+   614→   614→          action={
+   615→   615→            !hasAny ? (
+   616→   616→              <Pressable
+   617→   617→                onClick={onAddNew}
+   618→   618→                className="px-5 py-2.5 rounded-full gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center gap-1.5"
+   619→   619→              >
+   620→   620→                <Plus size={15} />
+   621→   621→                New entry
+   622→   622→              </Pressable>
+   623→   623→            ) : undefined
+   624→   624→          }
+   625→   625→        />
+   626→   626→      ) : (
+   627→   627→        <div className="space-y-3">
+   628→   628→          <AnimatePresence initial={false}>
+   629→   629→            {visible.map((entry, i) => (
+   630→   630→              <StaggerItem key={entry.id} index={Math.min(i, 8)}>
+   631→   631→                <SwipeableRow
+   632→   632→                  onDelete={() => handleSwipeDelete(entry)}
+   633→   633→                  onArchive={(archived) => handleSwipeArchive(entry, archived)}
+   634→   634→                  archived={entry.archived}
+   635→   635→                  disabled={sel.mode}
+   636→   636→                >
+   637→   637→                  <CycleEntryCard
+   638→   638→                    entry={entry}
+   639→   639→                    selected={sel.isSelected(entry.id)}
+   640→   640→                    inSelectionMode={sel.mode}
+   641→   641→                    onTap={() => {
+   642→   642→                      if (sel.mode) sel.toggle(entry.id);
+   643→   643→                      else onEditEntry(entry);
+   644→   644→                    }}
+   645→   645→                    onLongPress={() => sel.enterMode(entry.id)}
+   646→   646→                  />
+   647→   647→                </SwipeableRow>
+   648→   648→              </StaggerItem>
+   649→   649→            ))}
+   650→   650→          </AnimatePresence>
+   651→   651→        </div>
+   652→   652→      )}
+   653→   653→
+   654→   654→      {/* Selection bar — portaled to body to escape transformed ancestors */}
+   655→   655→      <Portal>
+   656→   656→        <SelectionBar
+   657→   657→          selectedCount={sel.selectedCount}
+   658→   658→          onCancel={sel.clearAll}
+   659→   659→          onDelete={handleMultiDelete}
+   660→   660→          onArchive={handleMultiArchive}
+   661→   661→          onSelectAll={sel.selectAll}
+   662→   662→          total={visible.length}
+   663→   663→        />
+   664→   664→      </Portal>
+   665→   665→
+   666→   666→      {/* FAB — hidden in selection mode */}
+   667→   667→      {!sel.mode && (
+   668→   668→        <Portal>
+   669→   669→          <motion.button
+   670→   670→            onClick={onAddNew}
+   671→   671→            whileTap={{ scale: 0.9 }}
+   672→   672→            whileHover={{ scale: 1.05 }}
+   673→   673→            className="fixed bottom-28 right-5 z-40 w-14 h-14 rounded-2xl gradient-primary-bg text-primary-foreground shadow-glow flex items-center justify-center"
+   674→   674→            aria-label="Add cycle entry"
+   675→   675→          >
+   676→   676→            <Plus size={24} />
+   677→   677→          </motion.button>
+   678→   678→        </Portal>
+   679→   679→      )}
+   680→   680→
+   681→   681→      {/* Confirm delete dialog */}
+   682→   682→      <Portal>
+   683→   683→        <ConfirmDialog
+   684→   684→          open={confirmDelete.open}
+   685→   685→          onOpenChange={(v) => setConfirmDelete((p) => ({ ...p, open: v }))}
+   686→   686→          title={
+   687→   687→            confirmDelete.ids.length > 1
+   688→   688→              ? `Delete ${confirmDelete.ids.length} entries?`
+   689→   689→              : "Delete this entry?"
+   690→   690→          }
+   691→   691→          description="This cannot be undone."
+   692→   692→          confirmLabel="Delete"
+   693→   693→          variant="destructive"
+   694→   694→          onConfirm={confirmDeleteAction}
+   695→   695→        />
+   696→   696→      </Portal>
+   697→   697→    </div>
+   698→   698→  );
+   699→   699→}
+   700→   700→
+   701→   701→/* ==================== ENTRY CARD ==================== */
+   702→   702→function CycleEntryCard({
+   703→   703→  entry,
+   704→   704→  selected,
+   705→   705→  inSelectionMode,
+   706→   706→  onTap,
+   707→   707→  onLongPress,
+   708→   708→}: {
+   709→   709→  entry: CycleEntry;
+   710→   710→  selected: boolean;
+   711→   711→  inSelectionMode: boolean;
+   712→   712→  onTap: () => void;
+   713→   713→  onLongPress: () => void;
+   714→   714→}) {
+   715→   715→  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   716→   716→  const longPressedRef = useRef(false);
+   717→   717→
+   718→   718→  const startPress = () => {
+   719→   719→    longPressedRef.current = false;
+   720→   720→    timerRef.current = setTimeout(() => {
+   721→   721→      longPressedRef.current = true;
+   722→   722→      onLongPress();
+   723→   723→    }, 450);
+   724→   724→  };
+   725→   725→  const cancelPress = () => {
+   726→   726→    if (timerRef.current) {
+   727→   727→      clearTimeout(timerRef.current);
+   728→   728→      timerRef.current = null;
+   729→   729→    }
+   730→   730→  };
+   731→   731→  useEffect(() => () => cancelPress(), []);
+   732→   732→
+   733→   733→  const handleClick = () => {
+   734→   734→    // If a long-press just fired, swallow the subsequent click
+   735→   735→    if (longPressedRef.current) {
+   736→   736→      longPressedRef.current = false;
+   737→   737→      return;
+   738→   738→    }
+   739→   739→    onTap();
+   740→   740→  };
+   741→   741→
+   742→   742→  return (
+   743→   743→    <button
+   744→   744→      type="button"
+   745→   745→      onPointerDown={startPress}
+   746→   746→      onPointerUp={cancelPress}
+   747→   747→      onPointerMove={cancelPress}
+   748→   748→      onPointerLeave={cancelPress}
+   749→   749→      onPointerCancel={cancelPress}
+   750→   750→      onClick={handleClick}
+   751→   751→      className="block w-full text-left select-none cursor-pointer"
+   752→   752→      aria-pressed={selected}
+   753→   753→    >
+   754→   754→      <SurfaceCard
+   755→   755→        className={cn(
+   756→   756→          "p-4 flex items-center gap-3 transition-shadow",
+   757→   757→          selected && "ring-2 ring-inset ring-primary"
+   758→   758→        )}
+   759→   759→      >
+   760→   760→        {/* Icon / type indicator */}
+   761→   761→        <div
+   762→   762→          className={cn(
+   763→   763→            "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
+   764→   764→            entry.isPeriod ? "gradient-primary-bg" : "bg-surface-secondary"
+   765→   765→          )}
+   766→   766→        >
+   767→   767→          {entry.isPeriod ? (
+   768→   768→            <Droplet size={18} className="text-primary-foreground" />
+   769→   769→          ) : (
+   770→   770→            <Sparkles size={18} className="text-text-tertiary" />
+   771→   771→          )}
+   772→   772→        </div>
+   773→   773→
+   774→   774→        {/* Content */}
+   775→   775→        <div className="flex-1 min-w-0">
+   776→   776→          <div className="flex items-center gap-2">
+   777→   777→            <p className="text-title text-text-primary font-semibold truncate">
+   778→   778→              {format(new Date(entry.date), "MMM d, yyyy")}
+   779→   779→            </p>
+   780→   780→            {entry.isPeriod ? (
+   781→   781→              <span className="px-2 py-0.5 rounded-full gradient-primary-bg text-primary-foreground text-[10px] font-bold uppercase tracking-wide shrink-0">
+   782→   782→                Period
+   783→   783→              </span>
+   784→   784→            ) : entry.symptoms.length > 0 ? (
+   785→   785→              <span className="px-2 py-0.5 rounded-full bg-surface-secondary text-text-secondary text-[10px] font-bold uppercase tracking-wide shrink-0">
+   786→   786→                Symptoms
+   787→   787→              </span>
+   788→   788→            ) : null}
+   789→   789→          </div>
+   790→   790→          <p className="text-caption text-text-secondary mt-0.5 truncate">
+   791→   791→            {entry.isPeriod
+   792→   792→              ? `${entry.flow ?? "light"} flow`
+   793→   793→              : "Symptoms only"}
+   794→   794→            {entry.symptoms.length > 0 &&
+   795→   795→              ` · ${entry.symptoms.length} symptom${
+   796→   796→                entry.symptoms.length === 1 ? "" : "s"
+   797→   797→              }`}
+   798→   798→            {entry.medication && ` · ${entry.medication}`}
+   799→   799→          </p>
+   800→   800→        </div>
+   801→   801→
+   802→   802→        {/* Trailing: checkbox in selection mode, chevron otherwise */}
+   803→   803→        {inSelectionMode ? (
+   804→   804→          <div
+   805→   805→            className={cn(
+   806→   806→              "w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0 transition-colors",
+   807→   807→              selected
+   808→   808→                ? "gradient-primary-bg border-transparent"
+   809→   809→                : "border-border bg-surface"
+   810→   810→            )}
+   811→   811→            aria-hidden
+   812→   812→          >
+   813→   813→            {selected && <Check size={15} className="text-primary-foreground" />}
+   814→   814→          </div>
+   815→   815→        ) : (
+   816→   816→          <ChevronRight size={18} className="text-text-tertiary shrink-0" />
+   817→   817→        )}
+   818→   818→      </SurfaceCard>
+   819→   819→    </button>
+   820→   820→  );
+   821→   821→}
+   822→   822→
+   823→   823→/* ==================== PORTAL ==================== */
+   824→   824→function Portal({ children }: { children: React.ReactNode }) {
+   825→   825→  // useSyncExternalStore avoids setState-in-effect and is SSR-safe:
+   826→   826→  // getServerSnapshot returns false, client snapshot returns true.
+   827→   827→  const mounted = React.useSyncExternalStore(
+   828→   828→    () => () => {},
+   829→   829→    () => true,
+   830→   830→    () => false
+   831→   831→  );
+   832→   832→  if (!mounted) return null;
+   833→   833→  return createPortal(children, document.body);
+   834→   834→}
+   835→   835→
+   836→   836→/* ---------- helpers ---------- */
+   837→   837→function cnDay({
+   838→   838→  inMonth,
+   839→   839→  today,
+   840→   840→  selected,
+   841→   841→  isPeriod,
+   842→   842→}: {
+   843→   843→  inMonth: boolean;
+   844→   844→  today: boolean;
+   845→   845→  selected: boolean;
+   846→   846→  isPeriod?: boolean;
+   847→   847→}) {
+   848→   848→  return cn(
+   849→   849→    "relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
+   850→   850→    isPeriod
+   851→   851→      ? "gradient-primary-bg shadow-glow"
+   852→   852→      : "hover:bg-surface-secondary",
+   853→   853→    !inMonth && "opacity-35",
+   854→   854→    selected && "ring-2 ring-primary ring-offset-2 ring-offset-surface"
+   855→   855→  );
+   856→   856→}
+   857→   857→

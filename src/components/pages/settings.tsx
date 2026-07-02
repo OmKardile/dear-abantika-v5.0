@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Palette,
   Bell,
   Database,
+  Archive as ArchiveIcon,
   Plus,
   Check,
   Download,
@@ -15,7 +17,11 @@ import {
   Clock,
   Trash2,
   Info,
+  ArchiveRestore,
+  Droplet,
   Sparkles,
+  BookHeart,
+  ShoppingBag,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { THEMES } from "@/lib/themes";
@@ -23,6 +29,10 @@ import {
   REMINDER_CATEGORIES,
   WEEKDAY_LABELS,
   type Reminder,
+  type CycleEntry,
+  type JournalEntry,
+  type WishlistItem,
+  type SortOption,
 } from "@/lib/types";
 import { formatTime, downloadJson } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
@@ -35,18 +45,29 @@ import {
   Pressable,
 } from "@/components/premium/primitives";
 import { ReminderForm } from "@/components/forms/reminder-form";
+import { SwipeableRow } from "@/components/premium/swipeable-row";
+import { SelectionBar } from "@/components/premium/selection-bar";
+import { SortMenu } from "@/components/premium/sort-menu";
+import { ConfirmDialog } from "@/components/premium/confirm-dialog";
+import { useSelection } from "@/hooks/use-selection";
 import { toast } from "@/hooks/use-toast";
 
-type Tab = "theme" | "reminders" | "backup";
+type Tab = "theme" | "reminders" | "backup" | "archive";
 
 export function Settings() {
   const reduce = useReducedMotion();
   const [tab, setTab] = React.useState<Tab>("theme");
 
-  const tabs: { id: Tab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-    { id: "theme", label: "Theme", icon: Palette },
-    { id: "reminders", label: "Reminders", icon: Bell },
-    { id: "backup", label: "Backup", icon: Database },
+  const tabs: {
+    id: Tab;
+    label: string;
+    short: string;
+    icon: React.ComponentType<{ size?: number }>;
+  }[] = [
+    { id: "theme", label: "Theme", short: "Theme", icon: Palette },
+    { id: "reminders", label: "Reminders", short: "Alerts", icon: Bell },
+    { id: "backup", label: "Backup", short: "Backup", icon: Database },
+    { id: "archive", label: "Archive", short: "Archive", icon: ArchiveIcon },
   ];
 
   return (
@@ -65,7 +86,7 @@ export function Settings() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold"
+            className="relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold min-w-0"
           >
             {tab === t.id && (
               <motion.div
@@ -76,12 +97,12 @@ export function Settings() {
             )}
             <span
               className={cn(
-                "relative z-10 flex items-center gap-1.5",
+                "relative z-10 flex items-center gap-1.5 min-w-0",
                 tab === t.id ? "text-primary-foreground" : "text-text-secondary"
               )}
             >
               <t.icon size={15} />
-              <span className="hidden xs:inline sm:inline">{t.label}</span>
+              <span className="hidden xs:inline sm:inline truncate">{t.short}</span>
             </span>
           </button>
         ))}
@@ -98,6 +119,7 @@ export function Settings() {
           {tab === "theme" && <ThemeTab />}
           {tab === "reminders" && <RemindersTab />}
           {tab === "backup" && <BackupTab />}
+          {tab === "archive" && <ArchiveTab />}
         </motion.div>
       </AnimatePresence>
 
@@ -215,28 +237,95 @@ function ThemeTab() {
 
 /* ============== REMINDERS TAB ============== */
 function RemindersTab() {
-  const { reminders, addReminder, updateReminder, deleteReminder } = useStore();
+  const {
+    reminders,
+    addReminder,
+    updateReminder,
+    deleteReminder,
+    bulkDeleteReminders,
+  } = useStore();
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<string | undefined>();
+  const [sort, setSort] = React.useState<SortOption>("newest");
+  const [confirmSingle, setConfirmSingle] = React.useState<Reminder | undefined>();
+  const [confirmBulk, setConfirmBulk] = React.useState(false);
 
   const editingReminder = reminders.find((r) => r.id === editing);
 
-  // sort by time
-  const sorted = [...reminders].sort((a, b) => a.time.localeCompare(b.time));
+  // Only show non-archived reminders here. Archived ones live in the Archive tab.
+  const activeReminders = React.useMemo(
+    () => reminders.filter((r) => !r.archived),
+    [reminders]
+  );
+
+  const sorted = React.useMemo(() => {
+    const arr = [...activeReminders];
+    switch (sort) {
+      case "oldest":
+        // insertion order (oldest added first)
+        return arr;
+      case "newest":
+        // reverse insertion order (newest added first)
+        return arr.reverse();
+      case "alpha":
+        return arr.sort((a, b) => a.title.localeCompare(b.title));
+      case "modified":
+        // by reminder time (HH:mm) ascending
+        return arr.sort((a, b) => a.time.localeCompare(b.time));
+      default:
+        return arr;
+    }
+  }, [activeReminders, sort]);
+
+  const sel = useSelection(sorted);
+
+  const handleSwipeDelete = (r: Reminder) => {
+    // Permanent delete after confirm — reminders are easily recreated, no undo.
+    setConfirmSingle(r);
+  };
+
+  const confirmSingleDelete = () => {
+    if (confirmSingle) {
+      deleteReminder(confirmSingle.id);
+      toast({ title: "Reminder deleted" });
+    }
+    setConfirmSingle(undefined);
+  };
+
+  const handleBulkDelete = () => {
+    if (sel.selected.length === 0) return;
+    setConfirmBulk(true);
+  };
+
+  const confirmBulkDelete = () => {
+    bulkDeleteReminders(sel.selected);
+    sel.clearAll();
+    setConfirmBulk(false);
+    toast({
+      title: `${sel.selected.length} reminders deleted`,
+    });
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-body text-text-secondary">
-          {reminders.length} {reminders.length === 1 ? "reminder" : "reminders"}
+          {activeReminders.length}{" "}
+          {activeReminders.length === 1 ? "reminder" : "reminders"}
         </p>
-        <Pressable
-          onClick={() => { setEditing(undefined); setFormOpen(true); }}
-          className="px-4 py-2 rounded-full gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center gap-1.5"
-        >
-          <Plus size={15} />
-          New
-        </Pressable>
+        <div className="flex items-center gap-2">
+          <SortMenu value={sort} onChange={setSort} />
+          <Pressable
+            onClick={() => {
+              setEditing(undefined);
+              setFormOpen(true);
+            }}
+            className="px-4 py-2 rounded-full gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center gap-1.5 shrink-0"
+          >
+            <Plus size={15} />
+            New
+          </Pressable>
+        </div>
       </div>
 
       {sorted.length === 0 ? (
@@ -246,7 +335,10 @@ function RemindersTab() {
           description="Add gentle nudges for water, medication, skincare or anything you'd like to remember."
           action={
             <Pressable
-              onClick={() => { setEditing(undefined); setFormOpen(true); }}
+              onClick={() => {
+                setEditing(undefined);
+                setFormOpen(true);
+              }}
               className="px-5 py-2.5 rounded-full gradient-primary-bg text-primary-foreground text-sm font-semibold shadow-glow flex items-center gap-1.5"
             >
               <Plus size={15} />
@@ -260,7 +352,7 @@ function RemindersTab() {
           {/* timeline rail */}
           <div className="absolute left-[10px] top-2 bottom-2 w-0.5 bg-divider" />
           <div className="space-y-3">
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {sorted.map((r, i) => (
                 <motion.div
                   key={r.id}
@@ -278,63 +370,27 @@ function RemindersTab() {
                       r.enabled ? "gradient-primary-bg" : "bg-surface-secondary"
                     )}
                   />
-                  <Pressable
-                    onClick={() => { setEditing(r.id); setFormOpen(true); }}
-                    className="w-full text-left"
+                  <SwipeableRow
+                    onDelete={() => handleSwipeDelete(r)}
+                    disabled={sel.mode}
                   >
-                    <SurfaceCard className={cn("p-4", !r.enabled && "opacity-60")}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-surface-secondary flex items-center justify-center text-xl shrink-0">
-                          {REMINDER_CATEGORIES.find((c) => c.id === r.category)?.emoji}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-title text-text-primary truncate">
-                            {r.title}
-                          </p>
-                          <div className="flex items-center gap-1.5 text-caption text-text-secondary mt-0.5">
-                            <Clock size={12} />
-                            {formatTime(r.time)}
-                          </div>
-                          <div className="flex gap-1 mt-2">
-                            {WEEKDAY_LABELS.map((d, idx) => (
-                              <span
-                                key={idx}
-                                className={cn(
-                                  "text-[10px] font-bold w-4 h-4 rounded flex items-center justify-center",
-                                  r.days[idx]
-                                    ? "text-primary"
-                                    : "text-text-tertiary"
-                                )}
-                              >
-                                {d}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        {/* toggle */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateReminder(r.id, { enabled: !r.enabled });
-                          }}
-                          className={cn(
-                            "relative w-12 h-7 rounded-full transition-colors shrink-0",
-                            r.enabled ? "gradient-primary-bg" : "bg-border"
-                          )}
-                          aria-label={r.enabled ? "Disable" : "Enable"}
-                        >
-                          <motion.span
-                            layout
-                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                            className={cn(
-                              "absolute top-1 w-5 h-5 rounded-full bg-white shadow-md",
-                              r.enabled ? "left-6" : "left-1"
-                            )}
-                          />
-                        </button>
-                      </div>
-                    </SurfaceCard>
-                  </Pressable>
+                    <ReminderRow
+                      reminder={r}
+                      selected={sel.isSelected(r.id)}
+                      inSelectionMode={sel.mode}
+                      onTap={() => {
+                        if (sel.mode) sel.toggle(r.id);
+                        else {
+                          setEditing(r.id);
+                          setFormOpen(true);
+                        }
+                      }}
+                      onLongPress={() => sel.enterMode(r.id)}
+                      onToggleEnabled={() =>
+                        updateReminder(r.id, { enabled: !r.enabled })
+                      }
+                    />
+                  </SwipeableRow>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -352,8 +408,502 @@ function RemindersTab() {
         }}
         onDelete={deleteReminder}
       />
+
+      {/* Selection bar — portaled to body */}
+      <Portal>
+        <SelectionBar
+          selectedCount={sel.selectedCount}
+          onCancel={sel.clearAll}
+          onDelete={handleBulkDelete}
+          onSelectAll={sel.selectAll}
+          total={sorted.length}
+        />
+      </Portal>
+
+      {/* Confirm single delete */}
+      <Portal>
+        <ConfirmDialog
+          open={!!confirmSingle}
+          onOpenChange={(v) => {
+            if (!v) setConfirmSingle(undefined);
+          }}
+          title="Delete this reminder?"
+          description="This cannot be undone, but you can always recreate it."
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={confirmSingleDelete}
+        />
+      </Portal>
+
+      {/* Confirm bulk delete */}
+      <Portal>
+        <ConfirmDialog
+          open={confirmBulk}
+          onOpenChange={setConfirmBulk}
+          title={
+            sel.selectedCount > 1
+              ? `Delete ${sel.selectedCount} reminders?`
+              : "Delete this reminder?"
+          }
+          description="This cannot be undone, but you can always recreate them."
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={confirmBulkDelete}
+        />
+      </Portal>
     </div>
   );
+}
+
+function ReminderRow({
+  reminder,
+  selected,
+  inSelectionMode,
+  onTap,
+  onLongPress,
+  onToggleEnabled,
+}: {
+  reminder: Reminder;
+  selected: boolean;
+  inSelectionMode: boolean;
+  onTap: () => void;
+  onLongPress: () => void;
+  onToggleEnabled: () => void;
+}) {
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressedRef = React.useRef(false);
+
+  const startPress = () => {
+    longPressedRef.current = false;
+    timerRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      onLongPress();
+    }, 450);
+  };
+  const cancelPress = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+  React.useEffect(() => () => cancelPress(), []);
+
+  const handleClick = () => {
+    if (longPressedRef.current) {
+      longPressedRef.current = false;
+      return;
+    }
+    onTap();
+  };
+
+  return (
+    <button
+      type="button"
+      onPointerDown={startPress}
+      onPointerUp={cancelPress}
+      onPointerMove={cancelPress}
+      onPointerLeave={cancelPress}
+      onPointerCancel={cancelPress}
+      onClick={handleClick}
+      className="block w-full text-left select-none"
+      aria-pressed={selected}
+    >
+      <SurfaceCard
+        className={cn(
+          "p-4 transition-shadow",
+          !reminder.enabled && "opacity-60",
+          selected && "ring-2 ring-inset ring-primary"
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-surface-secondary flex items-center justify-center text-xl shrink-0">
+            {REMINDER_CATEGORIES.find((c) => c.id === reminder.category)?.emoji}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-title text-text-primary truncate">
+              {reminder.title}
+            </p>
+            <div className="flex items-center gap-1.5 text-caption text-text-secondary mt-0.5">
+              <Clock size={12} />
+              {formatTime(reminder.time)}
+            </div>
+            <div className="flex gap-1 mt-2">
+              {WEEKDAY_LABELS.map((d, idx) => (
+                <span
+                  key={idx}
+                  className={cn(
+                    "text-[10px] font-bold w-4 h-4 rounded flex items-center justify-center",
+                    reminder.days[idx] ? "text-primary" : "text-text-tertiary"
+                  )}
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+          {/* toggle (hidden in selection mode) */}
+          {inSelectionMode ? (
+            <div
+              className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0 transition-colors",
+                selected
+                  ? "gradient-primary-bg border-transparent"
+                  : "border-border bg-surface"
+              )}
+              aria-hidden
+            >
+              {selected && <Check size={15} className="text-primary-foreground" />}
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleEnabled();
+              }}
+              className={cn(
+                "relative w-12 h-7 rounded-full transition-colors shrink-0",
+                reminder.enabled ? "gradient-primary-bg" : "bg-border"
+              )}
+              aria-label={reminder.enabled ? "Disable" : "Enable"}
+            >
+              <motion.span
+                layout
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                className={cn(
+                  "absolute top-1 w-5 h-5 rounded-full bg-white shadow-md",
+                  reminder.enabled ? "left-6" : "left-1"
+                )}
+              />
+            </button>
+          )}
+        </div>
+      </SurfaceCard>
+    </button>
+  );
+}
+
+/* ============== ARCHIVE TAB ============== */
+function ArchiveTab() {
+  const {
+    cycleEntries,
+    journalEntries,
+    wishlistItems,
+    reminders,
+    archiveCycleEntry,
+    deleteCycleEntry,
+    archiveJournalEntry,
+    deleteJournalEntry,
+    archiveWishlistItem,
+    deleteWishlistItem,
+    archiveReminder,
+    deleteReminder,
+  } = useStore();
+
+  const [confirmDelete, setConfirmDelete] = React.useState<{
+    open: boolean;
+    type: "cycle" | "journal" | "wishlist" | "reminder";
+    id: string;
+  } | null>(null);
+  const [confirmEmptyAll, setConfirmEmptyAll] = React.useState(false);
+
+  const archivedCycles = cycleEntries.filter((e) => e.archived);
+  const archivedJournals = journalEntries.filter((e) => e.archived);
+  const archivedWishlist = wishlistItems.filter((e) => e.archived);
+  const archivedReminders = reminders.filter((e) => e.archived);
+
+  const sections = [
+    { type: "cycle" as const, label: "Cycle entries", emoji: "🌸", items: archivedCycles },
+    { type: "journal" as const, label: "Journal entries", emoji: "📔", items: archivedJournals },
+    { type: "wishlist" as const, label: "Wishlist items", emoji: "🛍️", items: archivedWishlist },
+    { type: "reminder" as const, label: "Reminders", emoji: "🔔", items: archivedReminders },
+  ].filter((s) => s.items.length > 0);
+
+  const totalCount =
+    archivedCycles.length +
+    archivedJournals.length +
+    archivedWishlist.length +
+    archivedReminders.length;
+
+  const handleRestore = (
+    type: "cycle" | "journal" | "wishlist" | "reminder",
+    id: string
+  ) => {
+    switch (type) {
+      case "cycle":
+        archiveCycleEntry(id, false);
+        break;
+      case "journal":
+        archiveJournalEntry(id, false);
+        break;
+      case "wishlist":
+        archiveWishlistItem(id, false);
+        break;
+      case "reminder":
+        archiveReminder(id, false);
+        break;
+    }
+    toast({ title: "Restored" });
+  };
+
+  const handlePermanentDelete = (
+    type: "cycle" | "journal" | "wishlist" | "reminder",
+    id: string
+  ) => {
+    setConfirmDelete({ open: true, type, id });
+  };
+
+  const confirmDeleteAction = () => {
+    if (!confirmDelete) return;
+    const { type, id } = confirmDelete;
+    switch (type) {
+      case "cycle":
+        deleteCycleEntry(id);
+        break;
+      case "journal":
+        deleteJournalEntry(id);
+        break;
+      case "wishlist":
+        deleteWishlistItem(id);
+        break;
+      case "reminder":
+        deleteReminder(id);
+        break;
+    }
+    setConfirmDelete(null);
+    toast({ title: "Permanently deleted" });
+  };
+
+  const handleEmptyAll = () => {
+    setConfirmEmptyAll(true);
+  };
+
+  const confirmEmptyAllAction = () => {
+    archivedCycles.forEach((e) => deleteCycleEntry(e.id));
+    archivedJournals.forEach((e) => deleteJournalEntry(e.id));
+    archivedWishlist.forEach((e) => deleteWishlistItem(e.id));
+    archivedReminders.forEach((e) => deleteReminder(e.id));
+    setConfirmEmptyAll(false);
+    toast({ title: "Archive emptied" });
+  };
+
+  if (totalCount === 0) {
+    return (
+      <EmptyState
+        emoji="🗂️"
+        title="Nothing archived"
+        description="Archived items rest here until you restore or delete them."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-body text-text-secondary">
+          {totalCount} archived {totalCount === 1 ? "item" : "items"}
+        </p>
+      </div>
+
+      {sections.map((section, sIdx) => (
+        <StaggerItem key={section.type} index={sIdx}>
+          <SurfaceCard className="p-5">
+            <SectionHeader
+              title={section.label}
+              subtitle={`${section.items.length} archived`}
+              className="mb-4"
+            />
+            <div className="space-y-2">
+              <AnimatePresence initial={false}>
+                {section.items.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -16, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <ArchivedItemRow
+                      type={section.type}
+                      item={item}
+                      onRestore={() => handleRestore(section.type, item.id)}
+                      onDelete={() =>
+                        handlePermanentDelete(section.type, item.id)
+                      }
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </SurfaceCard>
+        </StaggerItem>
+      ))}
+
+      {/* Empty archive button */}
+      <StaggerItem index={sections.length}>
+        <SurfaceCard className="p-5 border-error/20">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-error/10 flex items-center justify-center">
+              <Trash2 size={18} className="text-error" />
+            </div>
+            <div>
+              <p className="text-title text-text-primary">Empty archive</p>
+              <p className="text-caption text-text-secondary">
+                Permanently delete all {totalCount} archived items
+              </p>
+            </div>
+          </div>
+          <Pressable
+            onClick={handleEmptyAll}
+            className="w-full py-3 rounded-2xl border border-error/30 text-error text-sm font-semibold flex items-center justify-center gap-2"
+          >
+            <Trash2 size={16} />
+            Empty archive
+          </Pressable>
+        </SurfaceCard>
+      </StaggerItem>
+
+      {/* Confirm single permanent delete */}
+      <Portal>
+        <ConfirmDialog
+          open={!!confirmDelete}
+          onOpenChange={(v) => {
+            if (!v) setConfirmDelete(null);
+          }}
+          title="Delete permanently?"
+          description="This item will be gone for good. This cannot be undone."
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={confirmDeleteAction}
+        />
+      </Portal>
+
+      {/* Confirm empty all */}
+      <Portal>
+        <ConfirmDialog
+          open={confirmEmptyAll}
+          onOpenChange={setConfirmEmptyAll}
+          title={`Delete all ${totalCount} archived items?`}
+          description="This will permanently remove every archived item across your app. This cannot be undone."
+          confirmLabel="Empty archive"
+          variant="destructive"
+          onConfirm={confirmEmptyAllAction}
+        />
+      </Portal>
+    </div>
+  );
+}
+
+function ArchivedItemRow({
+  type,
+  item,
+  onRestore,
+  onDelete,
+}: {
+  type: "cycle" | "journal" | "wishlist" | "reminder";
+  item: CycleEntry | JournalEntry | WishlistItem | Reminder;
+  onRestore: () => void;
+  onDelete: () => void;
+}) {
+  // Derive title/description and archived-ago text per type
+  let title = "";
+  let subtitle = "";
+  let emoji = "";
+  let icon: React.ComponentType<{ size?: number; className?: string }> = Sparkles;
+
+  const archivedAt =
+    (item as { archivedAt?: string }).archivedAt ??
+    (item as { date?: string }).date ??
+    "";
+
+  if (type === "cycle") {
+    const e = item as CycleEntry;
+    title = e.date;
+    subtitle = e.isPeriod
+      ? `Period · ${e.flow ?? "light"} flow`
+      : e.symptoms.length > 0
+      ? `${e.symptoms.length} symptom${e.symptoms.length === 1 ? "" : "s"}`
+      : "Symptoms only";
+    emoji = "🌸";
+    icon = Droplet;
+  } else if (type === "journal") {
+    const e = item as JournalEntry;
+    title = e.title;
+    subtitle = e.reflection.slice(0, 60) + (e.reflection.length > 60 ? "…" : "");
+    emoji = "📔";
+    icon = BookHeart;
+  } else if (type === "wishlist") {
+    const e = item as WishlistItem;
+    title = e.title;
+    subtitle = e.description || "No description";
+    emoji = "🛍️";
+    icon = ShoppingBag;
+  } else {
+    const e = item as Reminder;
+    title = e.title;
+    subtitle = `${formatTime(e.time)} · ${
+      REMINDER_CATEGORIES.find((c) => c.id === e.category)?.label ?? "Reminder"
+    }`;
+    emoji = "🔔";
+    icon = Bell;
+  }
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-secondary">
+      <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-xl shrink-0">
+        {emoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-body text-text-primary font-semibold truncate">
+          {title}
+        </p>
+        <p className="text-caption text-text-secondary truncate mt-0.5">
+          {subtitle}
+        </p>
+        <p className="text-label text-text-tertiary mt-1">
+          archived {archivedAt ? archivedAgo(archivedAt) : "earlier"}
+        </p>
+      </div>
+      <div className="flex flex-col gap-1.5 shrink-0">
+        <Pressable
+          onClick={onRestore}
+          className="px-3 py-1.5 rounded-xl bg-surface border border-border text-primary text-caption font-semibold flex items-center gap-1"
+        >
+          <ArchiveRestore size={13} />
+          Restore
+        </Pressable>
+        <Pressable
+          onClick={onDelete}
+          className="px-3 py-1.5 rounded-xl border border-error/30 text-error text-caption font-semibold flex items-center gap-1"
+        >
+          <Trash2 size={13} />
+          Delete
+        </Pressable>
+      </div>
+    </div>
+  );
+}
+
+function archivedAgo(iso: string): string {
+  try {
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const diff = now - then;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d === 1) return "1d ago";
+    if (d < 7) return `${d}d ago`;
+    const w = Math.floor(d / 7);
+    if (w === 1) return "1w ago";
+    if (w < 5) return `${w}w ago`;
+    return new Date(iso).toLocaleDateString();
+  } catch {
+    return "earlier";
+  }
 }
 
 /* ============== BACKUP TAB ============== */
@@ -447,7 +997,7 @@ function BackupTab() {
             className="w-full py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border flex items-center justify-center gap-2"
           >
             <Upload size={16} />
-            Paste & restore
+            Paste &amp; restore
           </Pressable>
         </SurfaceCard>
       </StaggerItem>
@@ -535,4 +1085,16 @@ function BackupTab() {
       </AnimatePresence>
     </div>
   );
+}
+
+/* ==================== PORTAL ==================== */
+function Portal({ children }: { children: React.ReactNode }) {
+  // useSyncExternalStore avoids setState-in-effect and is SSR-safe:
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  if (!mounted) return null;
+  return createPortal(children, document.body);
 }

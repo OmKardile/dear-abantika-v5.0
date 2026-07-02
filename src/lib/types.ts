@@ -8,6 +8,8 @@ export interface CycleEntry {
   bbt?: number;
   medication?: string;
   notes?: string;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export interface JournalEntry {
@@ -17,6 +19,8 @@ export interface JournalEntry {
   mood: string;
   reflection: string;
   sticker?: string;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export type WishlistCategory =
@@ -33,6 +37,8 @@ export interface WishlistItem {
   notes?: string;
   link?: string;
   image?: string;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export type ReminderCategory =
@@ -48,11 +54,26 @@ export interface Reminder {
   category: ReminderCategory;
   days: boolean[]; // 7, Sunday=0
   enabled: boolean;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export interface HydrationHistoryPoint {
   date: string;
   amount: number;
+}
+
+export interface HydrationLog {
+  id: string;
+  timestamp: string; // ISO
+  amount: number; // ml (can be negative for removal)
+}
+
+export interface MoodLog {
+  id: string;
+  timestamp: string; // ISO
+  mood: string;
+  note?: string;
 }
 
 export interface AppData {
@@ -61,6 +82,8 @@ export interface AppData {
     goal: number;
     history: HydrationHistoryPoint[];
   };
+  hydrationLogs: HydrationLog[];
+  moodLogs: MoodLog[];
   mood: {
     current: string;
     date: string;
@@ -70,6 +93,12 @@ export interface AppData {
   wishlistItems: WishlistItem[];
   reminders: Reminder[];
 }
+
+export type SortOption =
+  | "newest"
+  | "oldest"
+  | "alpha"
+  | "modified";
 
 export const SYMPTOMS = [
   "Cramps",
@@ -120,3 +149,10 @@ export const REMINDER_CATEGORIES: {
 ];
 
 export const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
+export const SORT_LABELS: Record<SortOption, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  alpha: "A → Z",
+  modified: "Recently updated",
+};

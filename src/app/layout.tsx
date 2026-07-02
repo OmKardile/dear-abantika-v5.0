@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeApplier } from "@/components/providers/theme-applier";
+import { UndoProvider } from "@/components/providers/undo-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,7 +51,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeApplier>{children}</ThemeApplier>
+        <ThemeApplier>
+          <UndoProvider>{children}</UndoProvider>
+        </ThemeApplier>
         <Toaster />
       </body>
     </html>
