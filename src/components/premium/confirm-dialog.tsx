@@ -48,7 +48,7 @@ export function ConfirmDialog({
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.95, y: 10, opacity: 0 }}
             transition={{ type: "spring", stiffness: 360, damping: 28 }}
-            className="relative w-full max-w-sm rounded-[28px] surface-elevated p-6 text-center"
+            className="relative w-full max-w-sm rounded-[28px] glass-sheet p-6 text-center"
           >
             <div
               className={

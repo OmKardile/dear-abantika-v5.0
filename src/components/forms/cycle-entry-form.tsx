@@ -80,7 +80,7 @@ export function CycleEntryForm({
           exit={{ opacity: 0 }}
         >
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/30 backdrop-blur-md"
             onClick={() => onOpenChange(false)}
           />
           <motion.div
@@ -88,10 +88,10 @@ export function CycleEntryForm({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="relative w-full max-w-md max-h-[92dvh] overflow-y-auto no-scrollbar rounded-[32px] surface-elevated"
+            className="relative w-full max-w-md max-h-[92dvh] overflow-y-auto no-scrollbar rounded-[32px] glass-sheet"
           >
             {/* drag handle */}
-            <div className="sticky top-0 z-10 pt-3 pb-2 bg-elevated/80 backdrop-blur-xl rounded-t-[32px]">
+            <div className="sticky top-0 z-10 pt-3 pb-2 bg-transparent">
               <div className="mx-auto w-10 h-1.5 rounded-full bg-border" />
               <div className="flex items-center justify-between px-6 pt-3">
                 <div>

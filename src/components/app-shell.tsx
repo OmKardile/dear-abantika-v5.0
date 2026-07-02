@@ -106,7 +106,7 @@ export function AppShell({
               "linear-gradient(90deg, transparent, var(--border), transparent)",
           }}
         />
-        <div className="bg-elevated shadow-lifted">
+        <div className="glass-nav shadow-lifted">
           <div
             className="flex items-stretch justify-between px-1.5 py-1.5"
             style={{ minHeight: NAV_HEIGHT }}

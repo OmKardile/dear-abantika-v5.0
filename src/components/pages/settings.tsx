@@ -119,7 +119,7 @@ export function Settings() {
           <IconBadge icon={Info} variant="soft" size={40} />
           <div>
             <p className="text-title text-text-primary">About Abantika</p>
-            <p className="text-caption text-text-secondary">Version 3.1 · Premium</p>
+            <p className="text-caption text-text-secondary">Version 3.5 · Premium</p>
           </div>
         </div>
         <p className="text-body text-text-secondary leading-relaxed">

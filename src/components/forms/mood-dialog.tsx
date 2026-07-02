@@ -27,7 +27,7 @@ export function MoodDialog({
           exit={{ opacity: 0 }}
         >
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/30 backdrop-blur-md"
             onClick={() => onOpenChange(false)}
           />
           <motion.div
@@ -35,7 +35,7 @@ export function MoodDialog({
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 40, opacity: 0, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
-            className="relative w-full max-w-md rounded-[28px] surface-elevated p-6"
+            className="relative w-full max-w-md rounded-[28px] glass-sheet p-6"
           >
             <div className="flex items-center justify-between mb-1">
               <div>

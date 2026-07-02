@@ -45,7 +45,7 @@ export function UndoProvider({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className="pointer-events-auto w-full max-w-sm flex items-center gap-3 rounded-2xl surface-elevated pl-4 pr-2 py-2.5 shadow-lifted"
+              className="pointer-events-auto w-full max-w-sm flex items-center gap-3 rounded-2xl glass-sheet pl-4 pr-2 py-2.5 shadow-lifted"
             >
               <p className="flex-1 text-sm font-medium text-text-primary truncate">
                 {item.message}

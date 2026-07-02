@@ -415,7 +415,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
 
       {/* ===== Daily Reflection ===== */}
       <StaggerItem index={6}>
-        <SurfaceCard className="relative overflow-hidden p-5 text-center">
+        <div className="relative overflow-hidden p-5 text-center rounded-[24px] glass-card">
           <div
             aria-hidden
             className="absolute -right-8 -top-8 w-32 h-32 rounded-full opacity-20 blur-2xl"
@@ -460,7 +460,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (t: TabId) => void }) {
               ))}
             </div>
           </div>
-        </SurfaceCard>
+        </div>
       </StaggerItem>
 
       <MoodDialog

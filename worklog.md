@@ -397,3 +397,34 @@ Stage Summary:
 - Popup position: changed from bottom-sheet to centered modal ("totally most up")
 - Nav style: made stylish with gradient top edge + refined active pill, still solid and non-overlapping
 - All 7 forms portaled; shared Portal helper created
+
+---
+Task ID: v3.5-glassmorphism
+Agent: main (orchestrator)
+Task: Apply glassmorphism to popups and key surfaces, version 3.5
+
+Work Log:
+- Created 3 glass utility classes in globals.css:
+  - `.glass-sheet` — strong frost for popup sheets/dialogs (rgba(255,255,255,0.55) bg, blur(32px), saturate(180%), inset highlight, gradient overlay)
+  - `.glass-card` — lighter glass for cards (rgba(255,255,255,0.50) bg, blur(20px), saturate(160%))
+  - `.glass-nav` — near-opaque frost for bottom nav (rgba(255,255,255,0.72) bg, blur(28px), for readability)
+  - Dark-theme overrides for noir/midnight/forest/indigo: rgba(20,20,24,0.55) bg with light-on-dark glass treatment
+- Applied glass-sheet to ALL 7 form popups (reminder, cycle-entry, diary, hydration-log, mood-dialog, mood-log, wishlist) replacing surface-elevated
+- Applied glass-sheet to mood dialog, confirm dialog, undo snackbar
+- Applied glass-nav to bottom navigation (replaced bg-elevated)
+- Applied glass-card to Daily Reflection card on dashboard
+- Made form sticky headers transparent with backdrop-blur-md + white/10 borders so the glass body shows through
+- Softened backdrops from bg-black/40 to bg-black/30 with backdrop-blur-md
+- Used `!important` on backdrop-filter to override Tailwind v4's variable-based backdrop system
+- Used explicit rgba() instead of color-mix() (Lightning CSS was stripping color-mix)
+- Updated version to 3.5: layout.tsx metadata, settings about card, package.json
+- Verified: light theme form bg=rgba(255,255,255,0.55) blur(32px), dark theme form bg=rgba(20,20,24,0.55) blur(32px)
+- VLM: light form 8/10 "frosted glass with blur and subtle themed tint", dark form 7/10 "frosted glass with dark-themed tint"
+- Lint: 0 errors
+
+Stage Summary:
+- Glassmorphism applied to all popup windows (forms, dialogs, snackbars) with themed gradient tint + 32px blur
+- Bottom nav uses glass-nav (frosted but readable)
+- Daily Reflection card uses glass-card
+- Dark themes have proper dark glass overrides
+- Version 3.5

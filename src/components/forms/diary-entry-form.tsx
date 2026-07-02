@@ -76,7 +76,7 @@ export function DiaryEntryForm({ open, onOpenChange, existing, onSave, onDelete 
           exit={{ opacity: 0 }}
         >
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/30 backdrop-blur-md"
             onClick={() => onOpenChange(false)}
           />
           <motion.div
@@ -84,10 +84,10 @@ export function DiaryEntryForm({ open, onOpenChange, existing, onSave, onDelete 
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="relative w-full max-w-md max-h-[94dvh] flex flex-col rounded-[32px] surface-elevated"
+            className="relative w-full max-w-md max-h-[94dvh] flex flex-col rounded-[32px] glass-sheet"
           >
             {/* header */}
-            <div className="sticky top-0 z-10 pt-3 pb-3 px-6 bg-elevated/90 backdrop-blur-xl rounded-t-[32px] border-b border-divider">
+            <div className="sticky top-0 z-10 pt-3 pb-3 px-6 bg-transparent backdrop-blur-md border-b border-white/10">
               <div className="mx-auto w-10 h-1.5 rounded-full bg-border mb-3" />
               <div className="flex items-center justify-between">
                 <div>
@@ -203,7 +203,7 @@ export function DiaryEntryForm({ open, onOpenChange, existing, onSave, onDelete 
             </div>
 
             {/* footer actions */}
-            <div className="sticky bottom-0 px-6 py-4 bg-elevated/90 backdrop-blur-xl border-t border-divider flex gap-3">
+            <div className="sticky bottom-0 px-6 py-4 bg-transparent backdrop-blur-md border-t border-white/10 flex gap-3">
               {existing && onDelete && (
                 <button
                   onClick={() => {
