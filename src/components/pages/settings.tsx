@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Palette,
@@ -31,7 +30,7 @@ import {
   type JournalEntry,
   type WishlistItem,
 } from "@/lib/types";
-import { formatTime, downloadJson } from "@/lib/helpers";
+import { formatTime, downloadJson, readJsonFile } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
 import {
   SurfaceCard,
@@ -42,6 +41,7 @@ import {
   Pressable,
 } from "@/components/premium/primitives";
 import { ConfirmDialog } from "@/components/premium/confirm-dialog";
+import { Portal } from "@/components/premium/portal";
 import { toast } from "@/hooks/use-toast";
 
 type Tab = "theme" | "backup" | "archive";
@@ -554,17 +554,77 @@ function BackupTab() {
   const { exportData, importData, resetAll } = useStore();
   const [importOpen, setImportOpen] = React.useState(false);
   const [importText, setImportText] = React.useState("");
+  const [exporting, setExporting] = React.useState(false);
+  const [confirmReset, setConfirmReset] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const doExport = () => {
-    const data = exportData();
-    downloadJson(
-      data,
-      `abantika-backup-${new Date().toISOString().split("T")[0]}.json`
-    );
-    toast({ title: "Backup exported", description: "Your data has been saved." });
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const data = exportData();
+      const filename = `abantika-backup-${new Date().toISOString().split("T")[0]}.json`;
+      const result = await downloadJson(data, filename);
+      if (!result.success) {
+        toast({
+          title: "Export cancelled",
+          description: "No file was saved.",
+        });
+      } else if (result.method === "share") {
+        toast({
+          title: "Backup shared",
+          description: "Save it to Files or send it somewhere safe.",
+        });
+      } else if (result.method === "clipboard") {
+        toast({
+          title: "Backup copied",
+          description: "JSON copied to clipboard — paste into a notes app to save.",
+        });
+      } else {
+        toast({
+          title: "Backup exported",
+          description: "Your data has been saved.",
+        });
+      }
+    } catch {
+      toast({
+        title: "Export failed",
+        description: "Something went wrong. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const doImport = () => {
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await readJsonFile(file);
+      const ok = importData(text);
+      if (ok) {
+        toast({ title: "Backup restored", description: "Welcome back." });
+        setImportOpen(false);
+        setImportText("");
+      } else {
+        toast({
+          title: "Import failed",
+          description: "That file doesn't look like a valid backup.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Import failed",
+        description: "Could not read that file.",
+        variant: "destructive",
+      });
+    }
+    // reset input so the same file can be picked again
+    e.target.value = "";
+  };
+
+  const doImportPaste = () => {
     const ok = importData(importText);
     if (ok) {
       toast({ title: "Backup restored", description: "Welcome back." });
@@ -580,14 +640,27 @@ function BackupTab() {
   };
 
   const doReset = () => {
-    if (confirm("Reset all data? This cannot be undone.")) {
-      resetAll();
-      toast({ title: "Data reset", description: "Starting fresh." });
-    }
+    setConfirmReset(true);
+  };
+
+  const confirmResetAction = () => {
+    resetAll();
+    setConfirmReset(false);
+    toast({ title: "Data reset", description: "Starting fresh." });
   };
 
   return (
     <div className="space-y-4">
+      {/* hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        onChange={handleFilePick}
+        className="hidden"
+        aria-hidden
+      />
+
       {/* Privacy banner */}
       <SurfaceCard className="p-4 flex items-start gap-3">
         <div className="w-10 h-10 rounded-2xl bg-success/15 flex items-center justify-center shrink-0">
@@ -615,10 +688,11 @@ function BackupTab() {
           </div>
           <Pressable
             onClick={doExport}
-            className="w-full py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow flex items-center justify-center gap-2"
+            disabled={exporting}
+            className="w-full py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow flex items-center justify-center gap-2 disabled:opacity-60"
           >
             <Download size={16} />
-            Download backup
+            {exporting ? "Preparing…" : "Download backup"}
           </Pressable>
         </SurfaceCard>
       </StaggerItem>
@@ -631,17 +705,25 @@ function BackupTab() {
             <div>
               <p className="text-title text-text-primary">Restore backup</p>
               <p className="text-caption text-text-secondary">
-                Paste a previously exported JSON
+                Choose a file or paste JSON
               </p>
             </div>
           </div>
-          <Pressable
-            onClick={() => setImportOpen(true)}
-            className="w-full py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border flex items-center justify-center gap-2"
-          >
-            <Upload size={16} />
-            Paste &amp; restore
-          </Pressable>
+          <div className="flex gap-2">
+            <Pressable
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow flex items-center justify-center gap-2"
+            >
+              <Upload size={16} />
+              Choose file
+            </Pressable>
+            <Pressable
+              onClick={() => setImportOpen(true)}
+              className="flex-1 py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border flex items-center justify-center gap-2"
+            >
+              Paste JSON
+            </Pressable>
+          </div>
         </SurfaceCard>
       </StaggerItem>
 
@@ -669,75 +751,86 @@ function BackupTab() {
         </SurfaceCard>
       </StaggerItem>
 
-      {/* Import dialog */}
-      <AnimatePresence>
-        {importOpen && (
-          <motion.div
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setImportOpen(false)}
-            />
+      {/* Import dialog — portaled to body so it sits above the nav */}
+      <Portal>
+        <AnimatePresence>
+          {importOpen && (
             <motion.div
-              initial={{ y: 60, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 30 }}
-              className="relative w-full max-w-md rounded-[28px] surface-elevated p-6"
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
             >
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-headline text-text-primary">Restore data</h2>
-                <button
-                  onClick={() => setImportOpen(false)}
-                  className="w-9 h-9 rounded-full bg-surface-secondary flex items-center justify-center"
-                >
-                  <Plus size={18} className="rotate-45 text-text-secondary" />
-                </button>
-              </div>
-              <p className="text-caption text-text-secondary mb-3">
-                Paste your backup JSON below.
-              </p>
-              <textarea
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                rows={6}
-                placeholder='{"hydration": …}'
-                className="w-full rounded-2xl bg-surface-secondary border border-border p-4 text-caption font-mono text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/40 resize-none"
+              <div
+                className="absolute inset-0 bg-black/30 backdrop-blur-md"
+                onClick={() => setImportOpen(false)}
               />
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => setImportOpen(false)}
-                  className="flex-1 py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={doImport}
-                  className="flex-1 py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow"
-                >
-                  Restore
-                </button>
-              </div>
+              <motion.div
+                initial={{ y: 30, opacity: 0, scale: 0.97 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 20, opacity: 0, scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 360, damping: 30 }}
+                className="relative w-full max-w-md rounded-[28px] glass-sheet p-6"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-label text-text-tertiary">Restore</p>
+                    <h2 className="text-headline-serif text-text-primary">Paste JSON</h2>
+                  </div>
+                  <button
+                    onClick={() => setImportOpen(false)}
+                    className="w-9 h-9 rounded-full bg-surface-secondary flex items-center justify-center"
+                    aria-label="Close"
+                  >
+                    <Plus size={18} className="rotate-45 text-text-secondary" />
+                  </button>
+                </div>
+                <p className="text-caption text-text-secondary mb-3">
+                  Paste your backup JSON below, or close this and use{" "}
+                  <span className="font-semibold text-primary">Choose file</span>.
+                </p>
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  rows={6}
+                  placeholder='{"hydration": …}'
+                  className="w-full rounded-2xl bg-surface-secondary border border-border p-4 text-caption font-mono text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/40 resize-none"
+                />
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => setImportOpen(false)}
+                    className="flex-1 py-3 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={doImportPaste}
+                    disabled={!importText.trim()}
+                    className="flex-1 py-3 rounded-2xl gradient-primary-bg text-primary-foreground text-sm font-bold shadow-glow disabled:opacity-50"
+                  >
+                    Restore
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </Portal>
+
+      {/* Reset confirmation — portaled */}
+      <Portal>
+        <ConfirmDialog
+          open={confirmReset}
+          onOpenChange={setConfirmReset}
+          title="Reset all data?"
+          description="This permanently deletes every entry, log, and reminder on this device. Export a backup first if you want to keep it. This cannot be undone."
+          confirmLabel="Reset everything"
+          cancelLabel="Keep my data"
+          variant="destructive"
+          onConfirm={confirmResetAction}
+        />
+      </Portal>
     </div>
   );
 }
 
-/* ==================== PORTAL ==================== */
-function Portal({ children }: { children: React.ReactNode }) {
-  // useSyncExternalStore avoids setState-in-effect and is SSR-safe:
-  const mounted = React.useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false
-  );
-  if (!mounted) return null;
-  return createPortal(children, document.body);
-}

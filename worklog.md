@@ -428,3 +428,35 @@ Stage Summary:
 - Daily Reflection card uses glass-card
 - Dark themes have proper dark glass overrides
 - Version 3.5
+
+---
+Task ID: backup-restore-fix
+Agent: main (orchestrator)
+Task: Fix backup export not working on Android + add file picker import + portal dialogs
+
+Work Log:
+- Root cause: downloadJson() used <a download>.click() which is IGNORED by Android WebView — no file saved
+- Rewrote downloadJson() as async with 3-tier fallback:
+  1. Web Share API (navigator.share with File) — works on Android WebView 11+, iOS Safari, mobile Chrome; lets user save to Downloads or share
+  2. Blob download (<a download>) — works on desktop browsers
+  3. Clipboard copy — last resort so data is never lost
+- Returns {method, success} so the UI can show appropriate toast feedback
+- Added readJsonFile() helper using FileReader API
+- Rewrote BackupTab with:
+  - Export: async with loading state ("Preparing…") + contextual toasts (shared/copied/exported/cancelled/failed)
+  - Import: TWO options — "Choose file" (hidden <input type="file" accept=".json">) + "Paste JSON" (dialog with textarea)
+  - Reset: replaced native confirm() with premium ConfirmDialog ("Reset all data?" / "Keep my data" / "Reset everything")
+  - Import dialog: portaled to body via shared Portal (was trapped in main stacking context, overlapped by nav)
+  - Reset confirmation: portaled via Portal
+  - Import dialog uses glass-sheet styling, centered, above nav
+  - File picker auto-imports on selection + resets input so same file can be re-picked
+- Removed duplicate local Portal function from settings.tsx (now uses shared Portal from premium/portal.tsx)
+- Removed unused createPortal import
+- Verified: backup tab shows Download backup / Choose file / Paste JSON / Reset all data; paste dialog centered above nav; reset confirmation shows premium modal; 0 console errors; 0 lint errors
+
+Stage Summary:
+- Export on Android: FIXED (Web Share API lets user save to Downloads/Files or share)
+- Import: ENHANCED (file picker + paste JSON options)
+- Reset: upgraded from native confirm() to premium ConfirmDialog
+- Both dialogs portaled (no nav overlap)
+- Glassmorphism applied to paste dialog

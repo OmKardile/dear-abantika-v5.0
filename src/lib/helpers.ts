@@ -49,12 +49,61 @@ export function timeUntil(time: string): string {
   return `in ${hours}h ${mins}m`;
 }
 
-export function downloadJson(data: string, filename: string) {
-  const blob = new Blob([data], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+export async function downloadJson(
+  data: string,
+  filename: string
+): Promise<{ method: "share" | "download" | "clipboard"; success: boolean }> {
+  // 1. Try Web Share API with file — works on Android WebView (API 23+),
+  //    iOS Safari, and mobile Chrome. Lets the user save to Downloads or share.
+  if (typeof navigator !== "undefined" && navigator.canShare && navigator.share) {
+    try {
+      const file = new File([data], filename, { type: "application/json" });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Abantika Backup",
+          text: "Your wellness data backup",
+        });
+        return { method: "share", success: true };
+      }
+    } catch (e) {
+      // user cancelled or share failed — fall through to other methods
+      if ((e as Error).name === "AbortError") {
+        return { method: "share", success: false };
+      }
+    }
+  }
+
+  // 2. Fall back to blob download — works in desktop browsers
+  try {
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return { method: "download", success: true };
+  } catch {
+    // 3. Last resort: copy to clipboard so the user can paste into a notes app
+    try {
+      await navigator.clipboard.writeText(data);
+      return { method: "clipboard", success: true };
+    } catch {
+      return { method: "clipboard", success: false };
+    }
+  }
+}
+
+/** Read a JSON file from an <input type="file"> as text. */
+export function readJsonFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.readAsText(file);
+  });
 }
