@@ -7,6 +7,7 @@ import {
   Flower2,
   BookHeart,
   Droplet,
+  Sparkles,
   Bell,
   Settings,
   type LucideIcon,
@@ -19,6 +20,7 @@ export type TabId =
   | "cycle"
   | "journal"
   | "hydration"
+  | "care"
   | "reminders"
   | "settings";
 
@@ -27,7 +29,8 @@ const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "cycle", label: "Cycle", icon: Flower2 },
   { id: "journal", label: "Journal", icon: BookHeart },
   { id: "hydration", label: "Water", icon: Droplet },
-  { id: "reminders", label: "Reminders", icon: Bell },
+  { id: "care", label: "Care", icon: Sparkles },
+  { id: "reminders", label: "Alerts", icon: Bell },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

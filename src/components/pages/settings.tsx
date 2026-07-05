@@ -4,6 +4,8 @@ import * as React from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Palette,
+  SlidersHorizontal,
+  Lock,
   Bell,
   Database,
   Archive as ArchiveIcon,
@@ -20,15 +22,27 @@ import {
   Sparkles,
   BookHeart,
   ShoppingBag,
+  Fingerprint,
+  Delete,
+  SunMoon,
+  MoonStar,
+  Type,
+  Activity,
+  Pill,
+  CalendarDays,
+  Stethoscope,
+  CircleAlert,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { THEMES } from "@/lib/themes";
 import {
   REMINDER_CATEGORIES,
+  MEDICAL_DISCLAIMER,
   type Reminder,
   type CycleEntry,
   type JournalEntry,
   type WishlistItem,
+  type AppSettings,
 } from "@/lib/types";
 import { formatTime, downloadJson, readJsonFile } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
@@ -44,11 +58,15 @@ import { ConfirmDialog } from "@/components/premium/confirm-dialog";
 import { Portal } from "@/components/premium/portal";
 import { toast } from "@/hooks/use-toast";
 
-type Tab = "theme" | "backup" | "archive";
+type Tab = "theme" | "appearance" | "security" | "backup" | "archive";
+
+type FontSize = AppSettings["appearance"]["fontSize"];
+type AutoLock = "0" | "1" | "5" | "15";
 
 export function Settings() {
   const reduce = useReducedMotion();
   const [tab, setTab] = React.useState<Tab>("theme");
+  const { settings } = useStore();
 
   const tabs: {
     id: Tab;
@@ -57,6 +75,8 @@ export function Settings() {
     icon: React.ComponentType<{ size?: number }>;
   }[] = [
     { id: "theme", label: "Theme", short: "Theme", icon: Palette },
+    { id: "appearance", label: "Appearance", short: "Look", icon: SlidersHorizontal },
+    { id: "security", label: "Security", short: "Lock", icon: Lock },
     { id: "backup", label: "Backup", short: "Backup", icon: Database },
     { id: "archive", label: "Archive", short: "Archive", icon: ArchiveIcon },
   ];
@@ -77,7 +97,8 @@ export function Settings() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold min-w-0"
+            className="relative flex-1 flex items-center justify-center gap-1 py-2.5 font-semibold min-w-0"
+            aria-pressed={tab === t.id}
           >
             {tab === t.id && (
               <motion.div
@@ -88,12 +109,12 @@ export function Settings() {
             )}
             <span
               className={cn(
-                "relative z-10 flex items-center gap-1.5 min-w-0",
+                "relative z-10 flex items-center gap-1 min-w-0",
                 tab === t.id ? "text-primary-foreground" : "text-text-secondary"
               )}
             >
-              <t.icon size={15} />
-              <span className="hidden xs:inline sm:inline truncate">{t.short}</span>
+              <t.icon size={14} />
+              <span className="truncate text-[10px]">{t.short}</span>
             </span>
           </button>
         ))}
@@ -108,6 +129,8 @@ export function Settings() {
           transition={{ duration: 0.3 }}
         >
           {tab === "theme" && <ThemeTab />}
+          {tab === "appearance" && <AppearanceTab />}
+          {tab === "security" && <SecurityTab />}
           {tab === "backup" && <BackupTab />}
           {tab === "archive" && <ArchiveTab />}
         </motion.div>
@@ -119,13 +142,42 @@ export function Settings() {
           <IconBadge icon={Info} variant="soft" size={40} />
           <div>
             <p className="text-title text-text-primary">About Abantika</p>
-            <p className="text-caption text-text-secondary">Version 3.5 · Premium</p>
+            <p className="text-caption text-text-secondary">Version 5.0 · Premium</p>
           </div>
         </div>
         <p className="text-body text-text-secondary leading-relaxed">
           A private wellness companion. All your data lives only on this device —
           nothing is ever sent anywhere. Crafted with care for your daily rituals.
         </p>
+
+        {/* Status chips */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-secondary">
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full shrink-0",
+                settings.pcos.enabled ? "bg-success" : "bg-text-tertiary"
+              )}
+            />
+            <span className="text-caption text-text-secondary">PCOS Mode</span>
+            <span className="text-caption font-semibold text-text-primary ml-auto">
+              {settings.pcos.enabled ? "On" : "Off"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-secondary">
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full shrink-0",
+                settings.security.pinEnabled ? "bg-success" : "bg-text-tertiary"
+              )}
+            />
+            <span className="text-caption text-text-secondary">App Lock</span>
+            <span className="text-caption font-semibold text-text-primary ml-auto">
+              {settings.security.pinEnabled ? "On" : "Off"}
+            </span>
+          </div>
+        </div>
+
         <div className="mt-4 flex items-center gap-1.5 text-caption text-text-tertiary">
           Made with <Heart size={12} className="text-primary" fill="currentColor" /> for gentle days
         </div>
@@ -134,19 +186,142 @@ export function Settings() {
   );
 }
 
+/* ============== SHARED UI ============== */
+function ToggleSwitch({
+  checked,
+  onChange,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className={cn(
+        "relative w-12 h-7 rounded-full transition-colors shrink-0",
+        checked
+          ? "gradient-primary-bg"
+          : "bg-surface-secondary border border-border",
+        disabled && "opacity-50"
+      )}
+    >
+      <motion.div
+        layout
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        className={cn(
+          "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md",
+          checked ? "left-[22px]" : "left-0.5"
+        )}
+      />
+    </button>
+  );
+}
+
+function SegmentedControl({
+  value,
+  options,
+  onChange,
+  layoutId,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  layoutId: string;
+}) {
+  return (
+    <div className="relative flex p-1 rounded-full surface-card">
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className="relative flex-1 flex items-center justify-center py-2 px-2 text-[12px] font-semibold min-w-0"
+            aria-pressed={active}
+          >
+            {active && (
+              <motion.div
+                layoutId={layoutId}
+                className="absolute inset-0 rounded-full gradient-primary-bg shadow-glow"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <span
+              className={cn(
+                "relative z-10 truncate",
+                active ? "text-primary-foreground" : "text-text-secondary"
+              )}
+            >
+              {opt.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ============== THEME TAB ============== */
 function ThemeTab() {
-  const { theme, setTheme } = useStore();
+  const { theme, setTheme, settings, setAppearance } = useStore();
+  const amoledOn = settings.appearance.amoledMode;
   return (
     <div className="space-y-4">
       <p className="text-body text-text-secondary px-1">
         Choose a palette that feels like home. Transitions are instant.
       </p>
+
+      {/* AMOLED quick-toggle */}
+      <StaggerItem index={0}>
+        <SurfaceCard
+          className={cn(
+            "p-4 flex items-center gap-3",
+            amoledOn && "ring-1 ring-primary/30"
+          )}
+        >
+          <div className="w-11 h-11 rounded-2xl bg-surface-secondary flex items-center justify-center shrink-0">
+            <MoonStar size={18} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-body text-text-primary font-semibold">AMOLED mode</p>
+            <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+              Pure black background for OLED screens
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={amoledOn}
+            onChange={(v) => setAppearance({ amoledMode: v })}
+            aria-label="Toggle AMOLED mode"
+          />
+        </SurfaceCard>
+      </StaggerItem>
+
+      {amoledOn && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-2 px-1 text-caption text-text-secondary"
+        >
+          <Sparkles size={13} className="text-primary mt-0.5 shrink-0" />
+          <span>Dark themes look best with AMOLED mode on.</span>
+        </motion.div>
+      )}
+
       <div className="space-y-4">
         {THEMES.map((t, i) => {
           const active = theme === t.id;
           return (
-            <StaggerItem key={t.id} index={i}>
+            <StaggerItem key={t.id} index={i + 1}>
               <Pressable
                 onClick={() => setTheme(t.id)}
                 className="w-full text-left"
@@ -222,6 +397,653 @@ function ThemeTab() {
         })}
       </div>
     </div>
+  );
+}
+
+/* ============== APPEARANCE TAB ============== */
+function AppearanceTab() {
+  const { settings, setAppearance, setPCOS } = useStore();
+  const { appearance, pcos } = settings;
+
+  const fontSizeClass: Record<FontSize, string> = {
+    small: "text-[13px]",
+    medium: "text-[15px]",
+    large: "text-[17px]",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* AMOLED Mode */}
+      <StaggerItem index={0}>
+        <SurfaceCard className="p-5">
+          <div className="flex items-start gap-3">
+            <IconBadge icon={MoonStar} variant="soft" size={44} />
+            <div className="flex-1 min-w-0">
+              <p className="text-title text-text-primary">AMOLED mode</p>
+              <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+                Pure black background for OLED screens, saves battery.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={appearance.amoledMode}
+              onChange={(v) => setAppearance({ amoledMode: v })}
+              aria-label="Toggle AMOLED mode"
+            />
+          </div>
+        </SurfaceCard>
+      </StaggerItem>
+
+      {/* Font size */}
+      <StaggerItem index={1}>
+        <SurfaceCard className="p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <IconBadge icon={Type} variant="soft" size={44} />
+            <div className="min-w-0">
+              <p className="text-title text-text-primary">Font size</p>
+              <p className="text-caption text-text-secondary">
+                Adjust text scale across the app
+              </p>
+            </div>
+          </div>
+          <SegmentedControl
+            value={appearance.fontSize}
+            layoutId="appearance-fontsize"
+            onChange={(v) =>
+              setAppearance({ fontSize: v as FontSize })
+            }
+            options={[
+              { value: "small", label: "Small" },
+              { value: "medium", label: "Medium" },
+              { value: "large", label: "Large" },
+            ]}
+          />
+          {/* Preview */}
+          <div className="mt-4 p-4 rounded-2xl bg-surface-secondary">
+            <p className="text-label text-text-tertiary mb-1.5">Preview</p>
+            <p
+              className={cn(
+                "text-text-primary leading-relaxed font-serif italic",
+                fontSizeClass[appearance.fontSize]
+              )}
+            >
+              The quiet rituals of a gentle morning — tea, light, a soft start.
+            </p>
+          </div>
+        </SurfaceCard>
+      </StaggerItem>
+
+      {/* Dynamic colors */}
+      <StaggerItem index={2}>
+        <SurfaceCard className="p-5">
+          <div className="flex items-start gap-3">
+            <IconBadge icon={SunMoon} variant="soft" size={44} />
+            <div className="flex-1 min-w-0">
+              <p className="text-title text-text-primary">Dynamic colors</p>
+              <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+                Adapt colors to your wallpaper (Material You).
+              </p>
+              <p className="text-label text-text-tertiary mt-1">Preview only</p>
+            </div>
+            <ToggleSwitch
+              checked={appearance.dynamicColors}
+              onChange={(v) => setAppearance({ dynamicColors: v })}
+              aria-label="Toggle dynamic colors"
+            />
+          </div>
+        </SurfaceCard>
+      </StaggerItem>
+
+      {/* PCOS Mode */}
+      <StaggerItem index={3}>
+        <SurfaceCard
+          className={cn("p-5", pcos.enabled && "ring-1 ring-primary/30")}
+        >
+          <div className="flex items-start gap-3">
+            <IconBadge icon={Activity} variant="soft" size={44} />
+            <div className="flex-1 min-w-0">
+              <p className="text-title text-text-primary">PCOS Mode</p>
+              <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+                Enable PCOS-aware tracking with confidence-based predictions.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={pcos.enabled}
+              onChange={(v) => setPCOS({ enabled: v })}
+              aria-label="Toggle PCOS mode"
+            />
+          </div>
+
+          <AnimatePresence initial={false}>
+            {pcos.enabled && (
+              <motion.div
+                key="pcos-fields"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-4 pt-4 border-t border-divider space-y-4">
+                  {/* Cycle length override */}
+                  <div>
+                    <label className="text-caption text-text-secondary flex items-center gap-1.5 mb-1.5">
+                      <CalendarDays size={13} /> Average cycle length (days)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={pcos.cycleLengthAvg ?? ""}
+                      onChange={(e) =>
+                        setPCOS({
+                          cycleLengthAvg: e.target.value
+                            ? Number(e.target.value)
+                            : undefined,
+                        })
+                      }
+                      placeholder="e.g. 35"
+                      className="w-full rounded-2xl bg-surface-secondary border border-border p-3 text-body text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/40"
+                    />
+                  </div>
+
+                  {/* Diagnosed date */}
+                  <div>
+                    <label className="text-caption text-text-secondary flex items-center gap-1.5 mb-1.5">
+                      <CalendarDays size={13} /> Diagnosed date
+                    </label>
+                    <input
+                      type="date"
+                      value={pcos.diagnosedDate ?? ""}
+                      onChange={(e) =>
+                        setPCOS({
+                          diagnosedDate: e.target.value || undefined,
+                        })
+                      }
+                      className="w-full rounded-2xl bg-surface-secondary border border-border p-3 text-body text-text-primary outline-none focus:border-primary/40"
+                    />
+                  </div>
+
+                  {/* Insulin resistance */}
+                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-secondary">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-body text-text-primary font-semibold flex items-center gap-1.5">
+                        <Pill size={14} /> Insulin resistance
+                      </p>
+                      <p className="text-label text-text-tertiary mt-0.5">
+                        Affects cycle regularity & symptoms
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={!!pcos.insulinResistance}
+                      onChange={(v) => setPCOS({ insulinResistance: v })}
+                      aria-label="Toggle insulin resistance"
+                    />
+                  </div>
+
+                  {/* Medications */}
+                  <div>
+                    <label className="text-caption text-text-secondary flex items-center gap-1.5 mb-1.5">
+                      <Pill size={13} /> Medications & supplements
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={pcos.medications ?? ""}
+                      onChange={(e) =>
+                        setPCOS({
+                          medications: e.target.value || undefined,
+                        })
+                      }
+                      placeholder="e.g. Metformin 500mg, Inositol, Vitamin D…"
+                      className="w-full rounded-2xl bg-surface-secondary border border-border p-3 text-body text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/40 resize-none"
+                    />
+                  </div>
+
+                  {/* Doctor notes */}
+                  <div>
+                    <label className="text-caption text-text-secondary flex items-center gap-1.5 mb-1.5">
+                      <Stethoscope size={13} /> Doctor notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={pcos.doctorNotes ?? ""}
+                      onChange={(e) =>
+                        setPCOS({
+                          doctorNotes: e.target.value || undefined,
+                        })
+                      }
+                      placeholder="Notes from your healthcare provider…"
+                      className="w-full rounded-2xl bg-surface-secondary border border-border p-3 text-body text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/40 resize-none"
+                    />
+                  </div>
+
+                  {/* Medical disclaimer */}
+                  <div className="flex items-start gap-2 p-3 rounded-2xl bg-warning/10 border border-warning/20">
+                    <CircleAlert
+                      size={14}
+                      className="text-warning mt-0.5 shrink-0"
+                    />
+                    <p className="text-label text-text-secondary leading-relaxed">
+                      {MEDICAL_DISCLAIMER}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </SurfaceCard>
+      </StaggerItem>
+    </div>
+  );
+}
+
+/* ============== SECURITY TAB ============== */
+function SecurityTab() {
+  const { settings, setSecurity } = useStore();
+  const { security } = settings;
+
+  // PIN dialog state
+  const [pinDialog, setPinDialog] = React.useState<{
+    open: boolean;
+    mode: "set" | "change" | "disable";
+  }>({ open: false, mode: "set" });
+
+  const openPinSetup = () => setPinDialog({ open: true, mode: "set" });
+  const openPinChange = () => setPinDialog({ open: true, mode: "change" });
+  const openPinDisable = () => setPinDialog({ open: true, mode: "disable" });
+  const closePinDialog = () =>
+    setPinDialog((prev) => ({ ...prev, open: false }));
+
+  const handlePinSuccess = (pinHash?: string) => {
+    const mode = pinDialog.mode;
+    if (mode === "set") {
+      setSecurity({ pinEnabled: true, pinHash });
+      toast({ title: "PIN lock enabled" });
+    } else if (mode === "change") {
+      setSecurity({ pinHash });
+      toast({ title: "PIN changed" });
+    } else if (mode === "disable") {
+      setSecurity({
+        pinEnabled: false,
+        pinHash: undefined,
+        biometricEnabled: false,
+      });
+      toast({ title: "PIN lock disabled" });
+    }
+    closePinDialog();
+  };
+
+  const handleEnableToggle = (v: boolean) => {
+    if (v) openPinSetup();
+    else openPinDisable();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* App Lock section */}
+      <StaggerItem index={0}>
+        <SurfaceCard className="p-5">
+          <SectionHeader
+            title="App lock"
+            subtitle="Protect your private data"
+            className="mb-4"
+          />
+
+          {/* Enable PIN */}
+          <div className="flex items-start gap-3">
+            <IconBadge icon={Lock} variant="soft" size={44} />
+            <div className="flex-1 min-w-0">
+              <p className="text-body text-text-primary font-semibold">PIN lock</p>
+              <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+                Require a 4-digit PIN to open the app
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={security.pinEnabled}
+              onChange={handleEnableToggle}
+              aria-label="Toggle PIN lock"
+            />
+          </div>
+
+          {/* When enabled: change/disable + biometric */}
+          <AnimatePresence initial={false}>
+            {security.pinEnabled && (
+              <motion.div
+                key="pin-enabled"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-4 pt-4 border-t border-divider space-y-4">
+                  {/* Change / Disable buttons */}
+                  <div className="flex gap-2">
+                    <Pressable
+                      onClick={openPinChange}
+                      className="flex-1 py-2.5 rounded-2xl bg-surface-secondary text-text-primary text-sm font-semibold border border-border flex items-center justify-center gap-1.5"
+                    >
+                      <Lock size={14} /> Change PIN
+                    </Pressable>
+                    <Pressable
+                      onClick={openPinDisable}
+                      className="flex-1 py-2.5 rounded-2xl border border-error/30 text-error text-sm font-semibold flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 size={14} /> Disable
+                    </Pressable>
+                  </div>
+
+                  {/* Biometric */}
+                  <div className="flex items-start gap-3 p-3 rounded-2xl bg-surface-secondary">
+                    <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center shrink-0">
+                      <Fingerprint size={18} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-body text-text-primary font-semibold">
+                        Fingerprint / face
+                      </p>
+                      <p className="text-caption text-text-secondary mt-0.5 leading-relaxed">
+                        Use biometrics instead of typing your PIN
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={security.biometricEnabled}
+                      onChange={(v) => setSecurity({ biometricEnabled: v })}
+                      aria-label="Toggle biometric unlock"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </SurfaceCard>
+      </StaggerItem>
+
+      {/* Auto-lock */}
+      <StaggerItem index={1}>
+        <SurfaceCard className="p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <IconBadge icon={SunMoon} variant="soft" size={44} />
+            <div
+              className={cn("flex-1", !security.pinEnabled && "opacity-50")}
+            >
+              <p className="text-title text-text-primary">Auto-lock</p>
+              <p className="text-caption text-text-secondary">
+                {security.pinEnabled
+                  ? "Lock the app after inactivity"
+                  : "Enable PIN lock to use auto-lock"}
+              </p>
+            </div>
+          </div>
+          <SegmentedControl
+            value={String(security.autoLockMinutes) as AutoLock}
+            layoutId="security-autolock"
+            onChange={(v) => setSecurity({ autoLockMinutes: Number(v) })}
+            options={[
+              { value: "0", label: "Never" },
+              { value: "1", label: "1 min" },
+              { value: "5", label: "5 min" },
+              { value: "15", label: "15 min" },
+            ]}
+          />
+        </SurfaceCard>
+      </StaggerItem>
+
+      {/* PIN dialog — portaled above nav */}
+      <Portal>
+        <PinPadDialog
+          open={pinDialog.open}
+          mode={pinDialog.mode}
+          expectedHash={security.pinHash}
+          onClose={closePinDialog}
+          onSuccess={handlePinSuccess}
+        />
+      </Portal>
+    </div>
+  );
+}
+
+/* ============== PIN PAD DIALOG ============== */
+function PinPadDialog({
+  open,
+  mode,
+  expectedHash,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  mode: "set" | "change" | "disable";
+  expectedHash?: string;
+  onClose: () => void;
+  onSuccess: (pinHash?: string) => void;
+}) {
+  type Stage = "verify-current" | "set-new" | "confirm-new";
+  const initialStage: Stage = mode === "set" ? "set-new" : "verify-current";
+  const [stage, setStage] = React.useState<Stage>(initialStage);
+  const [entry, setEntry] = React.useState("");
+  const [tempPin, setTempPin] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [shakeKey, setShakeKey] = React.useState(0);
+
+  // Refs to avoid stale closures inside setTimeout
+  const onSuccessRef = React.useRef(onSuccess);
+  React.useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  // Reset on open
+  React.useEffect(() => {
+    if (open) {
+      setStage(initialStage);
+      setEntry("");
+      setTempPin(null);
+      setError(null);
+      setShakeKey(0);
+    }
+  }, [open, initialStage]);
+
+  // Lock body scroll while open
+  React.useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  const titles: Record<Stage, string> = {
+    "verify-current": "Enter your current PIN",
+    "set-new":
+      mode === "change" ? "Enter a new 4-digit PIN" : "Create a 4-digit PIN",
+    "confirm-new": "Re-enter to confirm",
+  };
+
+  const advanceStage = (pin: string) => {
+    if (stage === "verify-current") {
+      if (btoa(pin) === expectedHash) {
+        if (mode === "disable") {
+          onSuccessRef.current(undefined);
+          return;
+        }
+        setError(null);
+        setStage("set-new");
+        setEntry("");
+      } else {
+        setError("Incorrect PIN. Try again.");
+        setShakeKey((k) => k + 1);
+        setEntry("");
+      }
+    } else if (stage === "set-new") {
+      setTempPin(pin);
+      setError(null);
+      setStage("confirm-new");
+      setEntry("");
+    } else if (stage === "confirm-new") {
+      if (pin === tempPin) {
+        onSuccessRef.current(btoa(pin));
+      } else {
+        setError("PINs don't match. Try again.");
+        setShakeKey((k) => k + 1);
+        setTempPin(null);
+        setStage("set-new");
+        setEntry("");
+      }
+    }
+  };
+
+  const handleDigit = (d: string) => {
+    if (entry.length >= 4) return;
+    setError(null);
+    const next = entry + d;
+    setEntry(next);
+    if (next.length === 4) {
+      // small delay so user sees the 4th dot fill
+      setTimeout(() => advanceStage(next), 180);
+    }
+  };
+
+  const handleBackspace = () => {
+    setError(null);
+    setEntry((prev) => prev.slice(0, -1));
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-md"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ y: 30, opacity: 0, scale: 0.97 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 20, opacity: 0, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 360, damping: 30 }}
+            className="relative w-full max-w-[340px] rounded-[28px] glass-sheet p-6"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-surface-secondary flex items-center justify-center shrink-0">
+                  <Lock size={16} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-label text-text-tertiary leading-tight">
+                    Security
+                  </p>
+                  <h2 className="text-headline-serif text-text-primary text-lg leading-tight truncate">
+                    {mode === "disable"
+                      ? "Disable PIN"
+                      : mode === "change"
+                      ? "Change PIN"
+                      : "Set up PIN"}
+                  </h2>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-surface-secondary flex items-center justify-center shrink-0"
+                aria-label="Close"
+              >
+                <Plus size={18} className="rotate-45 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Stage title */}
+            <p className="text-center text-caption text-text-secondary mb-4">
+              {titles[stage]}
+            </p>
+
+            {/* Dots (with shake on error) */}
+            <motion.div
+              key={shakeKey}
+              animate={
+                shakeKey > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }
+              }
+              transition={{ duration: 0.4 }}
+              className="flex gap-3.5 justify-center mb-2"
+            >
+              {[0, 1, 2, 3].map((i) => {
+                const filled = i < entry.length;
+                return (
+                  <motion.div
+                    key={i}
+                    animate={{ scale: filled ? 1 : 0.65 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 25,
+                    }}
+                    className={cn(
+                      "w-3.5 h-3.5 rounded-full transition-colors",
+                      filled ? "bg-primary" : "bg-border"
+                    )}
+                  />
+                );
+              })}
+            </motion.div>
+
+            {/* Error message slot */}
+            <div className="h-5 flex items-center justify-center mb-3">
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.p
+                    key={error}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="text-label text-error font-medium"
+                  >
+                    {error}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Number pad */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+                <motion.button
+                  key={d}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => handleDigit(d)}
+                  className="h-14 rounded-2xl bg-surface-secondary border border-border flex items-center justify-center text-xl font-semibold text-text-primary"
+                >
+                  {d}
+                </motion.button>
+              ))}
+              <div aria-hidden />
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => handleDigit("0")}
+                className="h-14 rounded-2xl bg-surface-secondary border border-border flex items-center justify-center text-xl font-semibold text-text-primary"
+              >
+                0
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={handleBackspace}
+                disabled={entry.length === 0}
+                className="h-14 rounded-2xl bg-surface-secondary border border-border flex items-center justify-center text-text-secondary disabled:opacity-40"
+                aria-label="Backspace"
+              >
+                <Delete size={20} />
+              </motion.button>
+            </div>
+
+            <p className="text-center text-label text-text-tertiary mt-4">
+              Your PIN is stored only on this device.
+            </p>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

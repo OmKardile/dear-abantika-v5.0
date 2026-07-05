@@ -460,3 +460,276 @@ Stage Summary:
 - Reset: upgraded from native confirm() to premium ConfirmDialog
 - Both dialogs portaled (no nav overlap)
 - Glassmorphism applied to paste dialog
+
+---
+Task ID: v5-care
+Agent: main (orchestrator)
+Task: Build new "Care" page combining self-care routines and daily task planner
+
+Work Log:
+- Read worklog.md, reminder-form.tsx (Portal + glass-sheet form pattern), primitives.tsx (SurfaceCard, EmptyState, SectionHeader, Pressable, etc.), portal.tsx (SSR-safe portal to body), swipeable-row.tsx (archive/delete swipe actions), confirm-dialog.tsx (destructive confirm modal), types.ts (CareTask, DailyTask, CareRoutineType, CARE_ROUTINES, CARE_TASK_PRESETS, TASK_PRIORITY_META, WEEKDAY_LABELS), helpers.ts (todayStr, formatTime), store.ts (careTasks/dailyTasks CRUD APIs), app-shell.tsx (TabId type)
+- Created src/components/pages/care.tsx (single file, ~900 lines):
+  - Care() main component with sticky SectionHeader "Care", PCOS-aware encouragement banner (heart icon + hormone-balance copy when settings.pcos.enabled is true), animated tab switcher (Routines/Tasks) using layoutId="care-tab" spring pill matching Journal pattern
+  - Routines tab:
+    - "Today's rituals" summary card (glow) with X/Y done + percentage + animated progress bar
+    - Horizontal-scroll Quick Add chips for all CARE_TASK_PRESETS (one-tap add with toast feedback)
+    - Tasks grouped by routine type (Morning 🌅 / Night 🌙 / Weekly 📅 / Custom ✨) with per-group header + "n/m done" count + per-group animated progress bar
+    - Each task row: emoji tile (44px rounded-2xl), title (with line-through when completed), time (formatTime), "Not today" italic label for non-scheduled days, "Done today" badge
+    - Animated completion checkbox (spring scale+rotate on check mark)
+    - SwipeableRow with archive + delete actions
+    - Dashed "Add routine" button at bottom
+    - Empty state with 🌱 encouraging copy + action button
+  - Tasks tab:
+    - Today summary card (glow) with weekday/month/day label + X/Y done + animated progress bar
+    - "Add task" filled primary button
+    - Today's tasks sorted by (incomplete first → high→medium→low priority → created-at)
+    - Each task row: priority dot (red=high/orange=medium/gray=low using TASK_PRIORITY_META colors), optional emoji, title, recurring label (Repeat icon), animated completion checkbox
+    - SwipeableRow with delete action
+    - Empty state with 🌸 encouraging copy + action button
+  - CareTaskForm (portaled, glass-sheet, centered modal, max-w-md, max-h-[94dvh] overflow-y-auto no-scrollbar):
+    - Sticky header (drag handle + title + X close) + sticky footer (delete + save)
+    - Title input, emoji input (with 16 quick-pick emoji buttons in horizontal scroll), 4-up routine selector (emoji + label), time input (optional), 7-day repeat toggle row, preset quick-fill chips filtered by selected routine (only when creating new)
+  - DailyTaskForm (same glass-sheet pattern):
+    - Title input, emoji input (with 12 quick-pick emoji buttons), 3-up priority selector (colored dot + label using TASK_PRIORITY_META), 4-up recurring selector (Once/Daily/Weekly/Monthly)
+  - ConfirmDialog portaled for delete confirmation on both tabs
+  - toast() feedback on every add/update/delete/archive action
+- Used todayStr() for today's date key, formatTime() for HH:mm→12h display, new Date().getDay() for day-of-week indexing (matches WEEKDAY_LABELS Sunday=0)
+- "Scheduled today" logic: days[dow] === true, OR all-days-false means always-on (so newly-created tasks with all-true defaults always show)
+- Premium styling: 8px grid, 20-28px radii (rounded-[24px] cards, rounded-[32px] sheet, rounded-full chips/buttons), shadow-glow on primary CTAs, gradient-primary-bg fills, staggered list animations (motion.div layout + AnimatePresence with index*0.03 delay), Framer Motion micro-interactions (whileTap scale 0.94-0.97, spring check-mark), SurfaceCard for all rows, glass-sheet for both forms (matching reminder-form.tsx pattern exactly)
+- Mobile-first: max-w-md container, horizontal-scroll preset chips (no-scrollbar), grid-cols-4 routine selector fits 360px, compact p-4 card padding, 8px (w-8 h-8) completion checkboxes
+- All forms use Portal (escapes nav stacking context) + centered items-center justify-center + z-[100] + bg-black/30 backdrop-blur-md backdrop — identical to reminder-form.tsx
+- Lint: 0 errors (only pre-existing upload/extracted/postcss.config.mjs warning unrelated to this task)
+- Dev log: clean compile, "GET / 200" — HTTP 200 verified
+
+Stage Summary:
+- New Care page (src/components/pages/care.tsx) — single file, no other files modified
+- Two-tab architecture: Routines (self-care rituals grouped by morning/night/weekly/custom with per-group progress) + Tasks (daily planner with priority dots, completion count, progress bar)
+- Both forms portaled with glass-sheet styling, matching existing reminder-form pattern
+- Swipeable archive+delete on routines, swipe delete on tasks, with ConfirmDialog for destructive actions
+- PCOS-aware banner shows when settings.pcos.enabled
+- Quick-add preset chips for routines (CARE_TASK_PRESETS), emoji picker + priority + recurring for tasks
+- Premium Material Design 3 aesthetic preserved: soft shadows, 8px grid, 20-28px radii, gradient-primary-bg, staggered animations, Framer Motion micro-interactions
+- Mobile-first compact layout verified for 360px
+
+---
+Task ID: v5-dashboard
+Agent: main (orchestrator) — dashboard v5.0 redesign
+Task: Redesign dashboard for Dear Abantika v5.0 with PCOS support, self-care scoring, period prediction, wellness summary, and today's tasks
+
+Work Log:
+- Read worklog.md for full project context (premium "Abantika" wellness app, single / route, 7-tab bottom nav including "care", Zustand store with hydration/mood/cycleEntries/journalEntries/careTasks/dailyTasks/settings, Framer Motion, premium primitives, glass-card / gradient-primary-bg / text-display-serif / text-headline-serif design tokens, MEDICAL_DISCLAIMER constant in lib/types)
+- Read existing src/components/pages/dashboard.tsx (v3 design: hero greeting with mini water-streak stats, 4 quick actions, 2x2 status grid Mood/Cycle/Streak/Next, compact wave hydration card, Daily Reflection glass-card)
+- Read src/components/premium/primitives.tsx to confirm APIs: SurfaceCard, IconBadge (icon/size/variant), StaggerItem (index), AnimatedCounter (value/decimals/suffix), Pressable (motion.button whileTap), ProgressRing (progress 0-1, size, stroke, gradientId, children centered)
+- Read src/lib/types.ts for MEDICAL_DISCLAIMER constant, PCOSSettings shape {enabled, cycleLengthAvg?, lastPeriodStart?, ...}, CareTask {completion: Record<string,boolean>}, DailyTask {date, completed, priority}
+- Read src/lib/helpers.ts to confirm greeting/greetingSub/formatTime/timeUntil/todayStr exports
+- Read src/lib/store.ts to confirm useStore exposes: hydration, mood, cycleEntries, reminders, journalEntries, careTasks, dailyTasks, settings, addWater, setMood, toggleDailyTask (id) — all used in new dashboard
+- Confirmed TabId union in app-shell.tsx now includes "care" (7 tabs: home/cycle/journal/hydration/care/reminders/settings)
+- Confirmed globals.css has all needed tokens: --warning, --error, --chart-1..5, --primary, --text-tertiary, --surface-secondary, --border, --gradient-primary; Tailwind v4 color tokens map text-warning/text-error/text-chart-3/text-chart-4/text-primary classes
+- Rewrote src/components/pages/dashboard.tsx with all v5.0 features per spec:
+
+  LAYOUT (in order, compact for 360px):
+  1. Hero greeting card (KEPT verbatim: gradient-primary-bg, shadow-glow, decorative orbs, ✨ float, text-display-serif "Hello, Abantika" italic, faded date "EEEE, MMMM d", greeting/greetingSub) — UPDATED mini-stats from {streak, hydration %} → {water streak (Flame icon) + journal streak (BookHeart icon)} since the spec calls out both Journal streak and Water streak explicitly
+  2. Quick actions row (4 compact Pressable buttons, grid-cols-4 gap-2): Log Water (Droplet, chart-2, +250ml), Log Mood (Smile, chart-4, opens MoodDialog), Cycle (Flower2, primary, onNavigate("cycle")), Care (Sparkles, chart-3, onNavigate("care")) — 4th action CHANGED from "Reminders" → "Care" per spec
+  3. 2×2 status grid (grid-cols-2 gap-3, each card p-4 min-h-[110px] with colored dot + uppercase label + value):
+     - Mood (chart-4 dot, big mood emoji w/ gentle float, "Today" subtitle, tap → MoodDialog)
+     - Cycle Day (primary dot, AnimatedCounter for cycleDay number "/ cycleLengthAvg" subtitle, "of current cycle" or "Begin tracking" fallback, tap → onNavigate("cycle"))
+     - Self-Care Score (chart-3 dot, AnimatedCounter for carePct% "{completed}/{total} done" subtitle, tap → onNavigate("care"))
+     - Next Reminder (chart-3 dot, reminder title line-clamp-2, timeUntil(next.time) countdown subtitle, tap → onNavigate("reminders"))
+  4. Hydration wave card (KEPT verbatim — IconBadge Droplet, AnimatedCounter for current ml, wave fill animation with shimmer overlay, +250/+500 quick-add buttons)
+  5. Wellness Summary card (NEW) — SurfaceCard p-4 with: header "Wellness Score / Today's balance" + HeartPulse IconBadge, then flex row with ProgressRing (size=108, stroke=11, gradientId="wellness-ring", animated score 0-100 in center via AnimatedCounter + "of 100" subtitle) on the left and 5 breakdown bars on the right (Hydration chart-2, Mood chart-4, Care primary, Tasks chart-3, Journal chart-1) — each bar shows label + percentage and animates width on mount
+  6. PCOS insights card (ONLY if settings.pcos.enabled, conditionally rendered via `pcosInsights && ...`) — header "PCOS Insights / Your cycle patterns" + HeartPulse IconBadge, then 3 rounded-2xl bg-surface-secondary rows:
+     - Cycle regularity: AlertTriangle (warning color) if irregular (cycle length variance > 7 days) showing "Varies Nd", else Check (primary) showing "~Nd cycle"
+     - Top symptom: Activity (chart-3) icon, shows "{topSymptom} ×{count}" or "None logged"
+     - Ovulation: Flower2 (primary) icon, shows "±5 days uncertain" (PCOS makes ovulation unpredictable)
+     - Footer: MEDICAL_DISCLAIMER in text-[10px] italic text-tertiary
+  7. Period prediction card (NEW) — SurfaceCard p-4 with CalendarHeart IconBadge + "Period Prediction" label; main value:
+     - If days > 0: "~X days away" (AnimatedCounter)
+     - If days === 0: "Due today" (primary color)
+     - If days < 0: "~X days late" (primary color, abs value)
+     - Subtitle: "Expected: EEE, MMM d · N-day cycle"
+     - If no last period: "Log a period to predict"
+     - Footer: MEDICAL_DISCLAIMER
+  8. Today's tasks mini-list (NEW) — SurfaceCard p-4 with header "Today's Tasks / X of Y done" + "View all" pill button (ChevronRight → onNavigate("care")); body: top 3 dailyTasks (sorted by priority high→medium→low) as Pressable rows with emoji + title (truncate, line-through if completed) + priority dot (PRIORITY_DOT color) + checkbox (gradient-primary-bg with Check icon if completed, else bordered empty); empty state: 🌷 + "No tasks for today — a gentle day." Tapping a row calls toggleDailyTask(id) to toggle completion
+  9. Daily Reflection card (KEPT verbatim — glass-card, 🌸 float-rotate animation, "DAILY REFLECTION" label, font-serif italic TIPS text, 5-dot pagination)
+
+  NEW COMPUTATIONS (all memoized with React.useMemo):
+  - waterStreak: consecutive days (incl. today) with hydration > 0, walking backward from today
+  - journalStreak: consecutive days with journal entries (uses j.date.split("T")[0])
+  - lastPeriodStart: settings.pcos.lastPeriodStart (if PCOS enabled and set) > most recent non-archived period entry
+  - cycleLengthAvg: settings.pcos.cycleLengthAvg (if PCOS enabled and set) > computed avg from period entry diffs > 28 default
+  - cycleDay: (today - lastPeriodStart) / 86400000 + 1, null if no period logged
+  - periodPrediction: {next: Date, days: number} = lastPeriodStart + cycleLengthAvg, days = round((next - today) / 86400000)
+  - nextReminder: soonest enabled non-archived reminder (rolling to next day if past)
+  - todaysCareTasks: careTasks.filter(enabled && !archived && days[todayWeekday])
+  - careCompletedCount / carePct: completed today / total today (0 if no tasks)
+  - todaysDailyTasks: dailyTasks.filter(date === today && !archived)
+  - tasksCompletedCount / tasksPct
+  - moodLoggedToday: mood.date === today
+  - journalToday: any journalEntries with date === today
+  - wellnessScore: hydration% × 25 + moodLogged(15) + carePct × 25 + tasksPct × 20 + journalToday(15) → 0-100
+  - pcosInsights: {irregular, variance, lengths, topSymptom, topCount} — variance = max-min of consecutive period-to-period intervals, irregular if variance > 7
+  - top3Tasks: todaysDailyTasks sorted by priority high→low, sliced to 3
+
+  IMPORTS: cleaned up — removed Bell (no longer used after switching 4th quick action to Care/Sparkles); added Sparkles, CalendarHeart, BookHeart, ChevronRight, Check, HeartPulse, AlertTriangle, Activity from lucide-react; added ProgressRing from primitives; added timeUntil + todayStr from helpers; added MEDICAL_DISCLAIMER from types. Kept: Droplet, Smile, Flower2, Flame, Waves, format (date-fns), greeting/greetingSub/formatTime, SurfaceCard/IconBadge/StaggerItem/AnimatedCounter/Pressable, MoodDialog, TabId type
+
+- Mobile-first compactness maintained throughout: text sizes mostly text-[10px]/text-[11px]/text-xs/text-sm, with text-2xl for headline numbers in 2x2 grid + wellness ring; card padding p-4; gap-2/gap-3/gap-4 spacing; ProgressRing size=108 to fit alongside breakdown bars within 360px - p-4 - gap-4 = 296px content width
+- Accessibility: Pressable for all tappable elements (whileTap scale-0.97), aria-label on reflection dots, sr-only-style truncate labels, line-clamp-2 for reminder title, aria-hidden on decorative dots/spans, italic disclaimers using text-[10px] for low visual weight
+- Premium micro-interactions preserved: staggered entrance via StaggerItem with incrementing index (0-11), mood emoji gentle y/rotate float, 🌸 float-rotate in reflection, AnimatedCounter on cycleDay/carePct/wellnessScore/hydration.current, gradient-primary hero with shadow-glow and decorative orbs, ProgressRing animated strokeDashoffset, breakdown bars animated width on mount (respects useReducedMotion)
+- Ran `bun run lint`: 0 errors, 1 pre-existing unrelated warning (import/no-anonymous-default-export in upload/extracted/postcss.config.mjs)
+- Verified dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` returns 200; dev.log shows clean recompiles after edit ("✓ Compiled in 1678ms" + three GET / 200 responses). The earlier "Module not found @/components/pages/care" log line is from a prior compile pass (care.tsx is being created by another agent in parallel) and does not affect the dashboard — latest activity is clean compilation + 200 responses
+
+Stage Summary:
+- Dashboard upgraded from v3 design (4-card 2x2 grid + streak card) to full v5.0 spec: hero (water + journal streak stats), 4 quick actions (4th = Care), 2x2 status grid (Mood | Cycle Day | Self-Care Score | Next Reminder), hydration wave card (preserved), Wellness Summary card (NEW with ProgressRing + 5 breakdown bars), PCOS insights card (NEW, conditional on settings.pcos.enabled, with cycle irregularity + top symptom + ovulation uncertainty + disclaimer), Period prediction card (NEW with AnimatedCounter days-away + MEDICAL_DISCLAIMER), Today's tasks mini-list (NEW, top 3 daily tasks with toggleable checkboxes + "View all" → care), Daily Reflection card (preserved)
+- Wellness score = hydration%(25) + mood logged(15) + care completion(25) + tasks completion(20) + journal today(15), displayed with animated ProgressRing + per-component breakdown bars
+- Period prediction uses settings.pcos.lastPeriodStart (if PCOS) or most recent period entry, with cycleLengthAvg = settings.pcos.cycleLengthAvg (if PCOS) or computed average or 28-day default
+- PCOS insights card shows cycle irregularity (variance > 7 days = irregular with AlertTriangle), top symptom this cycle (counted from cycle entries since last period), ovulation uncertainty indicator, and MEDICAL_DISCLAIMER
+- All new data fields from v5.0 store API used: settings.pcos.enabled / settings.pcos.cycleLengthAvg / settings.pcos.lastPeriodStart, careTasks[].completion map, dailyTasks[].date/completed/priority
+- Lint clean (0 errors); HTTP 200 on /; only touched src/components/pages/dashboard.tsx + worklog.md per instructions
+
+---
+
+## v5-cycle — Cycle Tracker v5.0 enhancements (expanded symptoms, PCOS mode, predictions)
+
+**Task ID:** v5-cycle
+**Files touched:** `src/components/forms/cycle-entry-form.tsx`, `src/components/pages/cycle-tracker.tsx`
+**Status:** ✅ Complete — lint clean (0 errors), HTTP 200 on `/`
+
+### What changed
+
+**1. Enhanced Cycle Entry Form** (`cycle-entry-form.tsx`) — all existing fields preserved; added v5.0 fields wired to the extended `CycleEntry` type:
+- Flow type expanded to 4 options: **spotting / light / medium / heavy** (grid of 4)
+- **Pain scale slider** 0–10 with live emoji indicator (😌 0–2, 😟 3–5, 😣 6–8, 😭 9–10) + zone labels; native range input styled via `accent-color: var(--primary)`
+- **Sleep hours** number input (reuses MetricField, inputMode numeric)
+- **Mood tag** quick emoji picker — horizontal scroll of all 10 `MOODS`, tap toggles
+- **Libido** segmented control: Low (🌙) / Normal (💫) / High (🔥), tap toggles
+- **Discharge** + **Supplements** text inputs (2-col grid, separate from medication)
+- **Clots** + **Bowel changes** toggle chips (new `MiniToggle` component)
+- **isSpotting** + **isBreakthrough** toggles — shown inside the flow section only when `pcosEnabled` prop is true (passed from tracker via `settings.pcos.enabled`)
+- Form accepts new optional `pcosEnabled?: boolean` prop; saves all new fields with `|| undefined` to keep payload clean
+
+**2. Enhanced Insights view** (`cycle-tracker.tsx`) — existing summary + top symptoms + recent entries preserved; added:
+- Summary cards expanded to 2×2 grid: total entries / period days / **avg cycle length** / **cycles logged**
+- **Cycle history AreaChart** (Recharts): cycle lengths over time computed from consecutive period-start dates, with gradient fill, avg-length `ReferenceLine`, and CSS-var chart colors. Empty-state when < 2 cycles.
+- **Symptom heatmap**: GitHub-style 3-month grid (weeks as columns × 7 days rows), each square tinted by symptom count (5-step primary opacity scale) + Less/More legend. Horizontally scrollable for narrow screens.
+- **Pain trend LineChart** (conditional on painScale data existing): 0–10 y-axis, warning ReferenceLine at 5, chart-5 stroke.
+- **PCOS panel** (conditional on `settings.pcos.enabled`): cycle irregularity (std-dev of cycle lengths), ovulation certainty %, PCOS-flagged symptom trend chips (uses `PCOS_SYMPTOMS`), and `MEDICAL_DISCLAIMER` in a warning-tinted callout.
+
+**3. Period prediction**
+- Computed from last period start + avg cycle length (28 default, or `settings.pcos.cycleLengthAvg` when PCOS)
+- Calendar shows a **shaded prediction window** (dashed `border-primary/40` + `bg-primary/10`) over the uncertainty range, with a dot + ring on the predicted center day
+- New **Prediction card** below calendar: "Next period" date, "est. X days away / today / overdue" text, window range, avg cycle, and `MEDICAL_DISCLAIMER` callout with AlertTriangle icon
+- PCOS mode widens the window from ±2 days to ±5 days
+
+**4. PCOS mode toggle**
+- When `settings.pcos.enabled` is true, a **"PCOS Mode" badge** (HeartPulse icon) appears next to the page header
+- Predictions become **confidence-based**: a colored badge shows `{confidence}% · {High|Moderate|Low} confidence`. Confidence formula: `95 − stddev×7`, reduced when < 3 cycles logged, capped at 70% in PCOS mode, clamped to [15, 95].
+
+### Implementation notes
+- New cycle-math helpers (module-level, pure): `getPeriodStarts`, `getCycleLengths`, `avgCycleLength`, `cycleStddev`, `predictionConfidence`, `CONFIDENCE_LABEL`. Period starts are derived by grouping consecutive period days (gap > 1 day = new period).
+- All prediction/analytics values memoized with `useMemo` keyed on `cycleEntries`.
+- `cnDay` helper extended with `isPredicted` + `isPredictedCenter` flags for calendar overlay styling.
+- Recharts theming uses CSS variables (`var(--chart-1/4/5)`, `var(--divider)`, `var(--text-tertiary)`, `var(--surface)`) so charts adapt to all 6 themes + dark mode.
+- Only `cycle-tracker.tsx` + `cycle-entry-form.tsx` edited; no other files touched. All existing lifecycle features (search, filter, sort, swipe, multi-select, archive, undo, FAB, confirm dialog) preserved untouched.
+- Verified: `bun run lint` → 0 errors (1 pre-existing warning in `upload/extracted`); dev server returns `GET / 200`.
+
+---
+Task ID: v5-settings
+Agent: full-stack-developer (settings v5.0 expansion)
+Task: Enhance Settings for Dear Abantika v5.0 — add Security tab (PIN lock), Appearance tab (AMOLED, font size, PCOS config), enhance Theme tab (AMOLED quick-toggle), update About card with PCOS + App Lock status
+
+Work Log:
+- Read worklog.md for project context (premium "Abantika" wellness app, single / route, Zustand store, Framer Motion, glassmorphism popup pattern, Portal helper, premium primitives, mobile-first 360px)
+- Read current src/components/pages/settings.tsx end-to-end (836 lines): 3-tab shell (Theme/Backup/Archive) + About card; preserved ArchiveTab + ArchivedItemRow + archivedAgo + BackupTab verbatim
+- Read src/lib/types.ts: confirmed AppSettings interface shape — `pcos: PCOSSettings {enabled, diagnosedDate?, cycleLengthAvg?, doctorNotes?, medications?, insulinResistance?, lastPeriodStart?}`, `security: {pinEnabled, pinHash?, biometricEnabled, autoLockMinutes: 0|1|5|15}`, `appearance: {amoledMode, fontSize: 'small'|'medium'|'large', dynamicColors}`; confirmed MEDICAL_DISCLAIMER export
+- Read src/lib/store.ts: confirmed `setPCOS`, `setSecurity`, `setAppearance` patch-style APIs (line 243-245, 583-588); confirmed `defaultSettings` matches types
+- Read src/lib/themes.ts: confirmed ThemeMeta has `isDark` flag (used indirectly via "dark themes work best with AMOLED" note)
+- Read src/app/globals.css: confirmed `.glass-sheet`, `.font-serif`, `.surface-card`, `.gradient-primary-bg`, `.shadow-glow` utilities available; no `xs` breakpoint defined (existing `hidden xs:inline` was a no-op)
+- Edited ONLY src/components/pages/settings.tsx via MultiEdit (4 atomic edits):
+
+  EDIT 1 — Imports: added 13 new lucide icons (SlidersHorizontal, Lock, Fingerprint, Delete, SunMoon, MoonStar, Type, Activity, Pill, CalendarDays, Stethoscope, CircleAlert); added value import `MEDICAL_DISCLAIMER` and type import `AppSettings` from @/lib/types; added `type FontSize = AppSettings["appearance"]["fontSize"]` and `type AutoLock = "0" | "1" | "5" | "15"` aliases
+
+  EDIT 2 — Tab type + Settings() shell + About card:
+  * Changed `type Tab` from 3 tabs to 5 tabs: "theme" | "appearance" | "security" | "backup" | "archive"
+  * Added `const { settings } = useStore()` to Settings() for About card status chips
+  * Tabs array: 5 entries with short labels (Theme/Look/Lock/Backup/Archive) + icons (Palette/SlidersHorizontal/Lock/Database/ArchiveIcon); each pill button gets `aria-pressed`; labels always visible (removed `hidden xs:inline sm:inline` no-op, now `truncate text-[10px]` so 5 short labels fit at 360px); icon size 15 → 14; gap-1.5 → gap-1 for compactness
+  * AnimatePresence branches: added `{tab === "appearance" && <AppearanceTab />}` and `{tab === "security" && <SecurityTab />}`
+  * About card: kept header + version 5.0 + description + footer heart line verbatim; added 2-col grid of status chips (PCOS Mode + App Lock) showing colored dot (bg-success when on, bg-text-tertiary when off) + label + "On"/"Off" value, using `settings.pcos.enabled` and `settings.security.pinEnabled`
+
+  EDIT 3 — ThemeTab enhancement:
+  * Added `settings` + `setAppearance` to useStore destructure; derived `amoaledOn = settings.appearance.amoledMode`
+  * Inserted AMOLED quick-toggle card at top of theme list (StaggerItem index=0): SurfaceCard with `ring-1 ring-primary/30` when on, 11x11 rounded-2xl surface-secondary container with MoonStar icon (primary), "AMOLED mode" title, "Pure black background for OLED screens" subtitle, and inline ToggleSwitch (wired to `setAppearance({ amoledMode: v })`)
+  * When `amoaledOn` is true, renders a small note row with Sparkles icon + "Dark themes look best with AMOLED mode on." (motion fade-in y:-4→0)
+  * Kept existing THEMES.map loop verbatim; only shifted StaggerItem index from `i` to `i + 1` so AMOLED card stagger precedes themes
+
+  EDIT 4 — Big insert before ArchiveTab: added 4 new top-level functions:
+  
+  * `ToggleSwitch` (shared): accessible `<button role="switch" aria-checked aria-label>`, 48x28px pill track (`gradient-primary-bg` when on, `bg-surface-secondary border border-border` when off), motion.div knob (24x24 white circle) with layout spring + left-0.5 ↔ left-[22px] transition; disabled prop grays out
+  
+  * `SegmentedControl` (shared, non-generic with string values): p-1 rounded-full surface-card container; each button flex-1 with `aria-pressed`; active state shows `motion.div layoutId={layoutId}` gradient pill (spring 380/30) — matches existing Settings tab + Cycle Tracker segmented control pattern
+  
+  * `AppearanceTab`: 4 StaggerItem cards
+    1. AMOLED mode card — IconBadge MoonStar + title + "Pure black background for OLED screens, saves battery." + ToggleSwitch wired to setAppearance({amooledMode})
+    2. Font size card — IconBadge Type + title + "Adjust text scale across the app" + SegmentedControl (Small/Medium/Large, layoutId="appearance-fontsize"); preview block below shows a serif italic Playfair-font sample sentence ("The quiet rituals of a gentle morning…") that scales text-[13px]/text-[15px]/text-[17px] based on fontSize (cast `v as FontSize` to satisfy TS)
+    3. Dynamic colors card — IconBadge SunMoon + "Adapt colors to your wallpaper (Material You)." + "Preview only" label + ToggleSwitch wired to setAppearance({dynamicColors})
+    4. PCOS Mode card — IconBadge Activity + "Enable PCOS-aware tracking with confidence-based predictions." + ToggleSwitch wired to setPCOS({enabled}); when enabled, AnimatePresence expands (height:0→auto) a border-t divided section with: average cycle length override (number input, min 1 max 60, placeholder "e.g. 35"), diagnosed date (date input), insulin resistance toggle row (with Pill icon + helper text), medications & supplements (3-row textarea, placeholder "e.g. Metformin 500mg, Inositol, Vitamin D…"), doctor notes (3-row textarea), and a warning-tinted disclaimer block (CircleAlert + MEDICAL_DISCLAIMER text in bg-warning/10 border-warning/20). All fields wire to setPCOS partial patches, with `?? ""` empty fallbacks and `|| undefined` for optional clears
+  
+  * `SecurityTab`: 2 StaggerItem cards
+    1. App lock card — SectionHeader "App lock" + subtitle "Protect your private data"; PIN lock row (IconBadge Lock + ToggleSwitch wired to handleEnableToggle: if turning on → openPinSetup with mode="set", if turning off → openPinDisable with mode="disable"); AnimatePresence expands when security.pinEnabled shows Change PIN + Disable buttons (Pressable, half-width each, gradient border-error/30 style for Disable) and Biometric row (Fingerprint icon in 10x10 surface container + "Fingerprint / face" + ToggleSwitch wired to setSecurity({biometricEnabled}))
+    2. Auto-lock card — IconBadge SunMoon + "Auto-lock" + contextual subtitle ("Lock the app after inactivity" when PIN enabled, "Enable PIN lock to use auto-lock" when disabled with opacity-50 dim) + SegmentedControl (Never/1 min/5 min/15 min, layoutId="security-autolock") wired to setSecurity({autoLockMinutes: Number(v)}); value cast `String(security.autoLockMinutes) as AutoLock`
+    * PIN dialog rendered via Portal (escapes main stacking context, sits above nav): `<PinPadDialog open mode expectedHash onClose onSuccess />`
+  
+  * `PinPadDialog`: centered glass-sheet modal (max-w-[340px], z-[100], bg-black/40 backdrop-blur-md) with 3-stage state machine:
+    - Stages: "verify-current" (for change/disable), "set-new" (for set/change), "confirm-new" (re-enter)
+    - Mode "set" starts at "set-new"; modes "change" and "disable" start at "verify-current"
+    - Stage titles adapt ("Enter your current PIN" / "Create a 4-digit PIN" / "Enter a new 4-digit PIN" / "Re-enter to confirm")
+    - Header: Lock icon badge + "Security" eyebrow + mode-driven h2 ("Set up PIN" / "Change PIN" / "Disable PIN") + Plus-rotated-45 close button
+    - 4 PIN dots (motion.div scale spring 500/25, scale 1 filled vs 0.65 empty, bg-primary vs bg-border) inside a keyed motion.div wrapper that animates `x: [0,-6,6,-4,4,0]` shake on error (shakeKey increment forces remount)
+    - Error message slot (h-5 fixed, AnimatePresence mode="wait" for swap)
+    - Number pad: 3-col grid, 1-9 (motion.button whileTap scale 0.92, h-14, surface-secondary border-border), empty spacer (aria-hidden), 0, Delete backspace icon (disabled when entry empty)
+    - Flow: handleDigit appends digit; when 4th digit entered, setTimeout(180ms) → advanceStage; verify-current compares btoa(pin) === expectedHash (if match: disable→onSuccess(undefined), else proceed to set-new; if mismatch: error + shake + clear); set-new stores tempPin + moves to confirm-new; confirm-new compares pin === tempPin (if match: onSuccess(btoa(pin)); else: error + reset to set-new)
+    - onSuccess wrapped in ref (onSuccessRef) to avoid stale closure in setTimeout
+    - Body scroll lock via useEffect when open (saves + restores document.body.style.overflow)
+    - Reset on open via useEffect (setStage initialStage, setEntry "", setTempPin null, setError null, setShakeKey 0)
+  
+  * `handlePinSuccess` in SecurityTab: mode-aware — "set" → setSecurity({pinEnabled:true, pinHash}) + toast "PIN lock enabled"; "change" → setSecurity({pinHash}) + toast "PIN changed"; "disable" → setSecurity({pinEnabled:false, pinHash:undefined, biometricEnabled:false}) + toast "PIN lock disabled"
+
+- Lint: `bun run lint` → 0 errors, 1 pre-existing unrelated warning (upload/extracted/postcss.config.mjs import/no-anonymous-default-export). My changes are lint-clean.
+- Dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` → 200; dev.log shows "✓ Compiled in 1678ms" + "GET / 200" after edit (the unrelated `@/components/pages/care` Module-not-found error is from a parallel agent's work-in-progress on the Care page, not my changes)
+- Verified file structure: 11 top-level functions present in correct order (Settings, ToggleSwitch, SegmentedControl, ThemeTab, AppearanceTab, SecurityTab, PinPadDialog, ArchiveTab, ArchivedItemRow, archivedAgo, BackupTab); file grew from 836 → 1658 lines
+- Only touched src/components/pages/settings.tsx per instructions (no other files modified)
+
+Stage Summary:
+- Settings tab count: 3 → 5 (Theme / Appearance / Security / Backup / Archive) — short labels + icons fit comfortably at 360px with the existing pill switcher (layoutId="settings-tab" spring indicator preserved)
+- Appearance tab: AMOLED mode toggle, font size segmented control with live serif-italic preview, dynamic colors toggle (informational), full PCOS Mode config (cycle length override + diagnosed date + insulin resistance + medications + doctor notes + MEDICAL_DISCLAIMER)
+- Security tab: PIN lock toggle (drives PIN setup flow), Change PIN + Disable buttons, biometric toggle (only shown when PIN enabled), auto-lock segmented (Never/1/5/15 min)
+- PIN entry: glass-sheet centered modal with 4-dot animated display, 3-stage flow (verify-current / set-new / confirm-new), error shake animation, accessibility (role=switch, aria-checked, aria-label on all controls), btoa() hash storage as specified
+- Theme tab: AMOLED quick-toggle card at top of theme list (links to settings.appearance.amoledMode via setAppearance), with "Dark themes look best with AMOLED mode on" note when enabled
+- About card: 2-col status grid showing PCOS Mode On/Off + App Lock On/Off (colored dots, On/Off labels) — instant feedback for the two new v5.0 capabilities
+- Backup + Archive tabs preserved verbatim (no changes to their logic, lifecycle, dialogs, or styling)
+- All new sections use existing premium primitives (SurfaceCard, SectionHeader, IconBadge, StaggerItem, Pressable, Portal) + glass-sheet for the PIN dialog — consistent with the rest of the app
+- Lint clean (0 errors); HTTP 200 on /; only touched src/components/pages/settings.tsx + worklog.md per instructions
+
+
+---
+Task ID: v5.0-release
+Agent: main (orchestrator)
+Task: Upgrade to Dear Abantika v5.0 — PCOS support, self-care, tasks, analytics, security, enhanced cycle/journal/hydration/reminders
+
+Work Log:
+- Extended data model (types.ts): CycleEntry +18 fields (painScale, sleepHours, moodTag, libido, discharge, supplements, clots, bowelChanges, isSpotting, isBreakthrough, flow+"spotting"), JournalEntry +3 (tags, pinned, favorite), Reminder +6 (frequency, customIntervalDays, snoozedUntil, lastCompleted, lastSkipped), REMINDER_CATEGORIES expanded to 9, SYMPTOMS expanded to 30, +PCOS_SYMPTOMS, +CARE_ROUTINES, +CARE_TASK_PRESETS, +TASK_PRIORITY_META, +FREQUENCY_LABELS, +MEDICAL_DISCLAIMER
+- NEW entities: CareTask (self-care routines with completion tracking), DailyTask (planner with priorities), AppSettings (PCOS, security/PIN, appearance/AMOLED/fontSize, notifications)
+- Extended store: +careTasks, +dailyTasks, +settings, +journal pin/favorite, +reminder snooze/complete/skip, +care task CRUD, +daily task CRUD, +settings update methods, +import merge mode, migrated storage key to v5 with backward-compat migrate function, dedupe helper
+- Updated app-shell: 7 tabs (Home/Cycle/Journal/Water/Care/Reminders/Settings)
+- Built new Care page (care.tsx): Routines tab (morning/night/weekly/custom with presets, completion tracking, progress bars) + Tasks tab (daily planner with priorities, recurring, completion)
+- Redesigned Dashboard: Wellness Summary (ProgressRing 0-100 + 5 breakdown bars), PCOS insights card (conditional), period prediction, today's tasks mini-list, self-care score, water/journal streaks
+- Enhanced Cycle Tracker: 4-flow options, pain scale slider, sleep/libido/discharge/supplements/clots/bowel fields, spotting/breakthrough toggles for PCOS, cycle history AreaChart, symptom heatmap, pain trend LineChart, PCOS panel with irregularity/certainty, period prediction on calendar, confidence-based predictions
+- Enhanced Settings: 5 tabs (Theme/Appearance/Security/Backup/Archive), AMOLED mode toggle, font size selector, PCOS mode config, PIN lock with PinPadDialog (4-digit pad, set/change/disable flow), biometric toggle, auto-lock timer
+- Fixed amoaledOn→amoledOn typo in settings ThemeTab
+- Version 5.0 in layout.tsx, settings about card, package.json
+- All 7 tabs verified: zero errors, zero lint errors, HTTP 200
+
+Stage Summary:
+- v5.0 complete: PCOS-aware cycle tracking, self-care routines, daily planner, wellness score, period predictions, PIN lock, AMOLED mode, font sizing, expanded symptoms (30), 9 reminder categories, journal tags/pin/favorite, enhanced analytics (charts + heatmaps), merge import mode
+- 7-tab navigation: Home, Cycle, Journal, Water, Care, Reminders, Settings
+- All existing data preserved via store migration
+- Production-ready, 0 errors

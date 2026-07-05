@@ -1,0 +1,700 @@
+     1→"use client";
+     2→
+     3→import { create } from "zustand";
+     4→import { persist, createJSONStorage } from "zustand/middleware";
+     5→import * as React from "react";
+     6→import type {
+     7→  AppData,
+     8→  AppSettings,
+     9→  CycleEntry,
+    10→  JournalEntry,
+    11→  WishlistItem,
+    12→  Reminder,
+    13→  HydrationLog,
+    14→  MoodLog,
+    15→  CareTask,
+    16→  DailyTask,
+    17→} from "./types";
+    18→import type { ThemeId } from "./themes";
+    19→
+    20→const todayStr = () => new Date().toISOString().split("T")[0];
+    21→const nowIso = () => new Date().toISOString();
+    22→
+    23→function seedHistory(): { date: string; amount: number }[] {
+    24→  const out: { date: string; amount: number }[] = [];
+    25→  for (let i = 6; i >= 1; i--) {
+    26→    const d = new Date();
+    27→    d.setDate(d.getDate() - i);
+    28→    out.push({
+    29→      date: d.toISOString().split("T")[0],
+    30→      amount: [1600, 1800, 1400, 2200, 1900, 1750][i - 1] ?? 1500,
+    31→    });
+    32→  }
+    33→  return out;
+    34→}
+    35→
+    36→function seedHydrationLogs(): HydrationLog[] {
+    37→  const now = Date.now();
+    38→  return [
+    39→    { id: "seed-h1", timestamp: new Date(now - 7200000).toISOString(), amount: 250 },
+    40→    { id: "seed-h2", timestamp: new Date(now - 3600000).toISOString(), amount: 500 },
+    41→  ];
+    42→}
+    43→
+    44→function seedMoodLogs(): MoodLog[] {
+    45→  const now = Date.now();
+    46→  return [
+    47→    { id: "seed-m1", timestamp: new Date(now - 86400000 * 2).toISOString(), mood: "😌" },
+    48→    { id: "seed-m2", timestamp: new Date(now - 86400000).toISOString(), mood: "🥰" },
+    49→    { id: "seed-m3", timestamp: new Date(now - 3600000).toISOString(), mood: "😊" },
+    50→  ];
+    51→}
+    52→
+    53→const defaultSettings: AppSettings = {
+    54→  pcos: {
+    55→    enabled: false,
+    56→  },
+    57→  security: {
+    58→    pinEnabled: false,
+    59→    biometricEnabled: false,
+    60→    autoLockMinutes: 0,
+    61→  },
+    62→  appearance: {
+    63→    amoledMode: false,
+    64→    fontSize: "medium",
+    65→    dynamicColors: true,
+    66→  },
+    67→  notifications: {
+    68→    enabled: true,
+    69→    sound: true,
+    70→    vibration: true,
+    71→  },
+    72→};
+    73→
+    74→function seedCareTasks(): CareTask[] {
+    75→  const now = nowIso();
+    76→  const today = todayStr();
+    77→  return [
+    78→    { id: "seed-c1", title: "Brush teeth", emoji: "🪥", routine: "morning", time: "07:30", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    79→    { id: "seed-c2", title: "Skincare", emoji: "✨", routine: "morning", time: "07:45", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    80→    { id: "seed-c3", title: "Sunscreen", emoji: "☀️", routine: "morning", time: "08:00", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    81→    { id: "seed-c4", title: "Take vitamins", emoji: "💊", routine: "morning", time: "08:30", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    82→    { id: "seed-c5", title: "Skincare", emoji: "🌙", routine: "night", time: "21:00", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    83→    { id: "seed-c6", title: "Brush teeth", emoji: "🪥", routine: "night", time: "22:00", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    84→  ];
+    85→}
+    86→
+    87→function seedDailyTasks(): DailyTask[] {
+    88→  const today = todayStr();
+    89→  const now = nowIso();
+    90→  return [
+    91→    { id: "seed-t1", title: "Drink 8 glasses of water", emoji: "💧", priority: "medium", date: today, completed: false, recurring: "daily", createdAt: now },
+    92→    { id: "seed-t2", title: "10 min meditation", emoji: "🧘", priority: "low", date: today, completed: false, recurring: "none", createdAt: now },
+    93→    { id: "seed-t3", title: "Log today's mood", emoji: "😊", priority: "medium", date: today, completed: true, completedAt: now, recurring: "daily", createdAt: now },
+    94→  ];
+    95→}
+    96→
+    97→const defaultData: AppData = {
+    98→  hydration: {
+    99→    current: 750,
+   100→    goal: 2000,
+   101→    history: seedHistory(),
+   102→  },
+   103→  hydrationLogs: seedHydrationLogs(),
+   104→  moodLogs: seedMoodLogs(),
+   105→  mood: { current: "😊", date: todayStr() },
+   106→  cycleEntries: [],
+   107→  journalEntries: [
+   108→    {
+   109→      id: "seed-j1",
+   110→      date: new Date(Date.now() - 86400000 * 2).toISOString(),
+   111→      title: "A slow, gentle morning",
+   112→      mood: "😌",
+   113→      reflection:
+   114→        "Woke up without an alarm and let the light pour in slowly. Sometimes the simplest mornings are the ones I needed most.",
+   115→      sticker: "🌙",
+   116→      tags: ["gratitude", "reflection"],
+   117→    },
+   118→    {
+   119→      id: "seed-j2",
+   120→      date: new Date(Date.now() - 86400000 * 5).toISOString(),
+   121→      title: "Grateful for small things",
+   122→      mood: "🥰",
+   123→      reflection:
+   124→        "Warm tea, a good book, and quiet — I'm learning that rest is productive too.",
+   125→      sticker: "✨",
+   126→      tags: ["joy"],
+   127→      favorite: true,
+   128→    },
+   129→  ],
+   130→  wishlistItems: [
+   131→    {
+   132→      id: "seed-w1",
+   133→      title: "Silk pillowcase",
+   134→      description: "Mulberry silk, blush pink — kinder to skin and hair.",
+   135→      category: "dream",
+   136→      notes: "King size",
+   137→    },
+   138→    {
+   139→      id: "seed-w2",
+   140→      title: "Ceramic pour-over set",
+   141→      description: "Hand-thrown stoneware for slow weekend rituals.",
+   142→      category: "save-later",
+   143→    },
+   144→  ],
+   145→  reminders: [
+   146→    {
+   147→      id: "seed-r1",
+   148→      title: "Morning vitamins",
+   149→      time: "08:00",
+   150→      category: "supplements",
+   151→      days: [false, true, true, true, true, true, false],
+   152→      enabled: true,
+   153→      frequency: "daily",
+   154→    },
+   155→    {
+   156→      id: "seed-r2",
+   157→      title: "Drink water",
+   158→      time: "10:00",
+   159→      category: "water",
+   160→      days: [false, true, true, true, true, true, false],
+   161→      enabled: true,
+   162→      frequency: "hourly",
+   163→    },
+   164→    {
+   165→      id: "seed-r3",
+   166→      title: "Evening skincare",
+   167→      time: "21:00",
+   168→      category: "skincare",
+   169→      days: [true, true, true, true, true, true, true],
+   170→      enabled: false,
+   171→      frequency: "daily",
+   172→    },
+   173→  ],
+   174→  careTasks: seedCareTasks(),
+   175→  dailyTasks: seedDailyTasks(),
+   176→  settings: defaultSettings,
+   177→};
+   178→
+   179→interface StoreState extends AppData {
+   180→  theme: ThemeId;
+   181→  // theme
+   182→  setTheme: (t: ThemeId) => void;
+   183→  // hydration
+   184→  addWater: (amount: number) => void;
+   185→  resetWater: () => void;
+   186→  setHydrationGoal: (goal: number) => void;
+   187→  // hydration logs
+   188→  addHydrationLog: (amount: number, timestamp?: string) => void;
+   189→  updateHydrationLog: (id: string, patch: Partial<HydrationLog>) => void;
+   190→  deleteHydrationLog: (id: string) => void;
+   191→  // mood
+   192→  setMood: (mood: string) => void;
+   193→  // mood logs
+   194→  addMoodLog: (mood: string, note?: string) => void;
+   195→  updateMoodLog: (id: string, patch: Partial<MoodLog>) => void;
+   196→  deleteMoodLog: (id: string) => void;
+   197→  // cycle
+   198→  addCycleEntry: (e: Omit<CycleEntry, "id">) => void;
+   199→  updateCycleEntry: (id: string, e: Partial<CycleEntry>) => void;
+   200→  deleteCycleEntry: (id: string) => void;
+   201→  archiveCycleEntry: (id: string, archived: boolean) => void;
+   202→  bulkDeleteCycleEntries: (ids: string[]) => void;
+   203→  bulkArchiveCycleEntries: (ids: string[], archived: boolean) => void;
+   204→  // journal
+   205→  addJournalEntry: (e: Omit<JournalEntry, "id">) => void;
+   206→  updateJournalEntry: (id: string, e: Partial<JournalEntry>) => void;
+   207→  deleteJournalEntry: (id: string) => void;
+   208→  archiveJournalEntry: (id: string, archived: boolean) => void;
+   209→  toggleJournalPin: (id: string) => void;
+   210→  toggleJournalFavorite: (id: string) => void;
+   211→  bulkDeleteJournalEntries: (ids: string[]) => void;
+   212→  bulkArchiveJournalEntries: (ids: string[], archived: boolean) => void;
+   213→  // wishlist
+   214→  addWishlistItem: (i: Omit<WishlistItem, "id">) => void;
+   215→  updateWishlistItem: (id: string, i: Partial<WishlistItem>) => void;
+   216→  deleteWishlistItem: (id: string) => void;
+   217→  archiveWishlistItem: (id: string, archived: boolean) => void;
+   218→  bulkDeleteWishlistItems: (ids: string[]) => void;
+   219→  bulkArchiveWishlistItems: (ids: string[], archived: boolean) => void;
+   220→  // reminders
+   221→  addReminder: (r: Omit<Reminder, "id">) => void;
+   222→  updateReminder: (id: string, r: Partial<Reminder>) => void;
+   223→  deleteReminder: (id: string) => void;
+   224→  archiveReminder: (id: string, archived: boolean) => void;
+   225→  snoozeReminder: (id: string, minutes: number) => void;
+   226→  completeReminder: (id: string) => void;
+   227→  skipReminder: (id: string) => void;
+   228→  bulkDeleteReminders: (ids: string[]) => void;
+   229→  // care tasks (self-care routines)
+   230→  addCareTask: (t: Omit<CareTask, "id" | "createdAt" | "completion">) => void;
+   231→  updateCareTask: (id: string, t: Partial<CareTask>) => void;
+   232→  deleteCareTask: (id: string) => void;
+   233→  archiveCareTask: (id: string, archived: boolean) => void;
+   234→  toggleCareTaskCompletion: (id: string, date: string) => void;
+   235→  // daily tasks (planner)
+   236→  addDailyTask: (t: Omit<DailyTask, "id" | "createdAt">) => void;
+   237→  updateDailyTask: (id: string, t: Partial<DailyTask>) => void;
+   238→  deleteDailyTask: (id: string) => void;
+   239→  toggleDailyTask: (id: string) => void;
+   240→  archiveDailyTask: (id: string, archived: boolean) => void;
+   241→  // settings
+   242→  updateSettings: (patch: Partial<AppSettings>) => void;
+   243→  setPCOS: (patch: Partial<AppSettings["pcos"]>) => void;
+   244→  setSecurity: (patch: Partial<AppSettings["security"]>) => void;
+   245→  setAppearance: (patch: Partial<AppSettings["appearance"]>) => void;
+   246→  // backup
+   247→  exportData: () => string;
+   248→  importData: (json: string, mode?: "overwrite" | "merge") => boolean;
+   249→  resetAll: () => void;
+   250→}
+   251→
+   252→const uid = () =>
+   253→  Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+   254→
+   255→/** Deduplicate an array of objects by their `id` field (last wins). */
+   256→function dedupe<T extends { id: string }>(arr: T[]): T[] {
+   257→  const map = new Map<string, T>();
+   258→  for (const item of arr) map.set(item.id, item);
+   259→  return Array.from(map.values());
+   260→}
+   261→
+   262→export const useStore = create<StoreState>()(
+   263→  persist(
+   264→    (set, get) => ({
+   265→      ...defaultData,
+   266→      theme: "linen",
+   267→
+   268→      setTheme: (theme) => set({ theme }),
+   269→
+   270→      addWater: (amount) =>
+   271→        set((s) => {
+   272→          const today = todayStr();
+   273→          const next = Math.max(0, s.hydration.current + amount);
+   274→          const history = [...s.hydration.history];
+   275→          const idx = history.findIndex((h) => h.date === today);
+   276→          if (idx >= 0) history[idx] = { date: today, amount: next };
+   277→          else history.push({ date: today, amount: next });
+   278→          const log: HydrationLog = {
+   279→            id: uid(),
+   280→            timestamp: nowIso(),
+   281→            amount,
+   282→          };
+   283→          return {
+   284→            hydration: {
+   285→              ...s.hydration,
+   286→              current: next,
+   287→              history: history.slice(-14),
+   288→            },
+   289→            hydrationLogs: [log, ...s.hydrationLogs].slice(0, 200),
+   290→          };
+   291→        }),
+   292→
+   293→      resetWater: () =>
+   294→        set((s) => ({ hydration: { ...s.hydration, current: 0 } })),
+   295→
+   296→      setHydrationGoal: (goal) =>
+   297→        set((s) => ({ hydration: { ...s.hydration, goal } })),
+   298→
+   299→      addHydrationLog: (amount, timestamp) =>
+   300→        set((s) => {
+   301→          const log: HydrationLog = {
+   302→            id: uid(),
+   303→            timestamp: timestamp ?? nowIso(),
+   304→            amount,
+   305→          };
+   306→          const today = todayStr();
+   307→          const isToday = (timestamp ?? nowIso()).startsWith(today);
+   308→          let current = s.hydration.current;
+   309→          let history = s.hydration.history;
+   310→          if (isToday) {
+   311→            current = Math.max(0, current + amount);
+   312→            const idx = history.findIndex((h) => h.date === today);
+   313→            if (idx >= 0) history = history.map((h, i) => i === idx ? { ...h, amount: current } : h);
+   314→            else history = [...history, { date: today, amount: current }];
+   315→          }
+   316→          return {
+   317→            hydrationLogs: [log, ...s.hydrationLogs].slice(0, 200),
+   318→            hydration: { ...s.hydration, current, history: history.slice(-14) },
+   319→          };
+   320→        }),
+   321→
+   322→      updateHydrationLog: (id, patch) =>
+   323→        set((s) => {
+   324→          const logs = s.hydrationLogs.map((l) => (l.id === id ? { ...l, ...patch } : l));
+   325→          // recompute today's total
+   326→          const today = todayStr();
+   327→          const todays = logs.filter((l) => l.timestamp.startsWith(today));
+   328→          const current = Math.max(0, todays.reduce((a, b) => a + b.amount, 0));
+   329→          let history = s.hydration.history;
+   330→          const idx = history.findIndex((h) => h.date === today);
+   331→          if (idx >= 0) history = history.map((h, i) => i === idx ? { ...h, amount: current } : h);
+   332→          else history = [...history, { date: today, amount: current }];
+   333→          return { hydrationLogs: logs, hydration: { ...s.hydration, current, history: history.slice(-14) } };
+   334→        }),
+   335→
+   336→      deleteHydrationLog: (id) =>
+   337→        set((s) => {
+   338→          const logs = s.hydrationLogs.filter((l) => l.id !== id);
+   339→          const today = todayStr();
+   340→          const todays = logs.filter((l) => l.timestamp.startsWith(today));
+   341→          const current = Math.max(0, todays.reduce((a, b) => a + b.amount, 0));
+   342→          let history = s.hydration.history;
+   343→          const idx = history.findIndex((h) => h.date === today);
+   344→          if (idx >= 0) history = history.map((h, i) => i === idx ? { ...h, amount: current } : h);
+   345→          else history = [...history, { date: today, amount: current }];
+   346→          return { hydrationLogs: logs, hydration: { ...s.hydration, current, history: history.slice(-14) } };
+   347→        }),
+   348→
+   349→      setMood: (mood) =>
+   350→        set((s) => ({
+   351→          mood: { current: mood, date: todayStr() },
+   352→          moodLogs: [
+   353→            { id: uid(), timestamp: nowIso(), mood },
+   354→            ...s.moodLogs,
+   355→          ].slice(0, 200),
+   356→        })),
+   357→
+   358→      addMoodLog: (mood, note) =>
+   359→        set((s) => ({
+   360→          moodLogs: [
+   361→            { id: uid(), timestamp: nowIso(), mood, note },
+   362→            ...s.moodLogs,
+   363→          ].slice(0, 200),
+   364→          mood: { current: mood, date: todayStr() },
+   365→        })),
+   366→
+   367→      updateMoodLog: (id, patch) =>
+   368→        set((s) => ({
+   369→          moodLogs: s.moodLogs.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+   370→        })),
+   371→
+   372→      deleteMoodLog: (id) =>
+   373→        set((s) => ({
+   374→          moodLogs: s.moodLogs.filter((m) => m.id !== id),
+   375→        })),
+   376→
+   377→      addCycleEntry: (e) =>
+   378→        set((s) => ({
+   379→          cycleEntries: [...s.cycleEntries, { ...e, id: uid() }],
+   380→        })),
+   381→      updateCycleEntry: (id, e) =>
+   382→        set((s) => ({
+   383→          cycleEntries: s.cycleEntries.map((x) =>
+   384→            x.id === id ? { ...x, ...e } : x
+   385→          ),
+   386→        })),
+   387→      deleteCycleEntry: (id) =>
+   388→        set((s) => ({
+   389→          cycleEntries: s.cycleEntries.filter((x) => x.id !== id),
+   390→        })),
+   391→      archiveCycleEntry: (id, archived) =>
+   392→        set((s) => ({
+   393→          cycleEntries: s.cycleEntries.map((x) =>
+   394→            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   395→          ),
+   396→        })),
+   397→      bulkDeleteCycleEntries: (ids) =>
+   398→        set((s) => ({
+   399→          cycleEntries: s.cycleEntries.filter((x) => !ids.includes(x.id)),
+   400→        })),
+   401→      bulkArchiveCycleEntries: (ids, archived) =>
+   402→        set((s) => ({
+   403→          cycleEntries: s.cycleEntries.map((x) =>
+   404→            ids.includes(x.id) ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   405→          ),
+   406→        })),
+   407→
+   408→      addJournalEntry: (e) =>
+   409→        set((s) => ({
+   410→          journalEntries: [{ ...e, id: uid() }, ...s.journalEntries],
+   411→        })),
+   412→      updateJournalEntry: (id, e) =>
+   413→        set((s) => ({
+   414→          journalEntries: s.journalEntries.map((x) =>
+   415→            x.id === id ? { ...x, ...e } : x
+   416→          ),
+   417→        })),
+   418→      deleteJournalEntry: (id) =>
+   419→        set((s) => ({
+   420→          journalEntries: s.journalEntries.filter((x) => x.id !== id),
+   421→        })),
+   422→      archiveJournalEntry: (id, archived) =>
+   423→        set((s) => ({
+   424→          journalEntries: s.journalEntries.map((x) =>
+   425→            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   426→          ),
+   427→        })),
+   428→      toggleJournalPin: (id) =>
+   429→        set((s) => ({
+   430→          journalEntries: s.journalEntries.map((x) =>
+   431→            x.id === id ? { ...x, pinned: !x.pinned } : x
+   432→          ),
+   433→        })),
+   434→      toggleJournalFavorite: (id) =>
+   435→        set((s) => ({
+   436→          journalEntries: s.journalEntries.map((x) =>
+   437→            x.id === id ? { ...x, favorite: !x.favorite } : x
+   438→          ),
+   439→        })),
+   440→      bulkDeleteJournalEntries: (ids) =>
+   441→        set((s) => ({
+   442→          journalEntries: s.journalEntries.filter((x) => !ids.includes(x.id)),
+   443→        })),
+   444→      bulkArchiveJournalEntries: (ids, archived) =>
+   445→        set((s) => ({
+   446→          journalEntries: s.journalEntries.map((x) =>
+   447→            ids.includes(x.id) ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   448→          ),
+   449→        })),
+   450→
+   451→      addWishlistItem: (i) =>
+   452→        set((s) => ({
+   453→          wishlistItems: [...s.wishlistItems, { ...i, id: uid() }],
+   454→        })),
+   455→      updateWishlistItem: (id, i) =>
+   456→        set((s) => ({
+   457→          wishlistItems: s.wishlistItems.map((x) =>
+   458→            x.id === id ? { ...x, ...i } : x
+   459→          ),
+   460→        })),
+   461→      deleteWishlistItem: (id) =>
+   462→        set((s) => ({
+   463→          wishlistItems: s.wishlistItems.filter((x) => x.id !== id),
+   464→        })),
+   465→      archiveWishlistItem: (id, archived) =>
+   466→        set((s) => ({
+   467→          wishlistItems: s.wishlistItems.map((x) =>
+   468→            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   469→          ),
+   470→        })),
+   471→      bulkDeleteWishlistItems: (ids) =>
+   472→        set((s) => ({
+   473→          wishlistItems: s.wishlistItems.filter((x) => !ids.includes(x.id)),
+   474→        })),
+   475→      bulkArchiveWishlistItems: (ids, archived) =>
+   476→        set((s) => ({
+   477→          wishlistItems: s.wishlistItems.map((x) =>
+   478→            ids.includes(x.id) ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   479→          ),
+   480→        })),
+   481→
+   482→      addReminder: (r) =>
+   483→        set((s) => ({
+   484→          reminders: [...s.reminders, { ...r, id: uid() }],
+   485→        })),
+   486→      updateReminder: (id, r) =>
+   487→        set((s) => ({
+   488→          reminders: s.reminders.map((x) =>
+   489→            x.id === id ? { ...x, ...r } : x
+   490→          ),
+   491→        })),
+   492→      deleteReminder: (id) =>
+   493→        set((s) => ({
+   494→          reminders: s.reminders.filter((x) => x.id !== id),
+   495→        })),
+   496→      archiveReminder: (id, archived) =>
+   497→        set((s) => ({
+   498→          reminders: s.reminders.map((x) =>
+   499→            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   500→          ),
+   501→        })),
+   502→      bulkDeleteReminders: (ids) =>
+   503→        set((s) => ({
+   504→          reminders: s.reminders.filter((x) => !ids.includes(x.id)),
+   505→        })),
+   506→
+   507→      snoozeReminder: (id, minutes) =>
+   508→        set((s) => ({
+   509→          reminders: s.reminders.map((x) =>
+   510→            x.id === id
+   511→              ? { ...x, snoozedUntil: new Date(Date.now() + minutes * 60000).toISOString() }
+   512→              : x
+   513→          ),
+   514→        })),
+   515→      completeReminder: (id) =>
+   516→        set((s) => ({
+   517→          reminders: s.reminders.map((x) =>
+   518→            x.id === id ? { ...x, lastCompleted: nowIso(), snoozedUntil: undefined } : x
+   519→          ),
+   520→        })),
+   521→      skipReminder: (id) =>
+   522→        set((s) => ({
+   523→          reminders: s.reminders.map((x) =>
+   524→            x.id === id ? { ...x, lastSkipped: nowIso(), snoozedUntil: undefined } : x
+   525→          ),
+   526→        })),
+   527→
+   528→      // ===== Care tasks (self-care routines) =====
+   529→      addCareTask: (t) =>
+   530→        set((s) => ({
+   531→          careTasks: [...s.careTasks, { ...t, id: uid(), createdAt: nowIso(), completion: {} }],
+   532→        })),
+   533→      updateCareTask: (id, t) =>
+   534→        set((s) => ({
+   535→          careTasks: s.careTasks.map((x) => (x.id === id ? { ...x, ...t } : x)),
+   536→        })),
+   537→      deleteCareTask: (id) =>
+   538→        set((s) => ({ careTasks: s.careTasks.filter((x) => x.id !== id) })),
+   539→      archiveCareTask: (id, archived) =>
+   540→        set((s) => ({
+   541→          careTasks: s.careTasks.map((x) =>
+   542→            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   543→          ),
+   544→        })),
+   545→      toggleCareTaskCompletion: (id, date) =>
+   546→        set((s) => ({
+   547→          careTasks: s.careTasks.map((x) =>
+   548→            x.id === id
+   549→              ? { ...x, completion: { ...x.completion, [date]: !x.completion[date] } }
+   550→              : x
+   551→          ),
+   552→        })),
+   553→
+   554→      // ===== Daily tasks (planner) =====
+   555→      addDailyTask: (t) =>
+   556→        set((s) => ({
+   557→          dailyTasks: [...s.dailyTasks, { ...t, id: uid(), createdAt: nowIso() }],
+   558→        })),
+   559→      updateDailyTask: (id, t) =>
+   560→        set((s) => ({
+   561→          dailyTasks: s.dailyTasks.map((x) => (x.id === id ? { ...x, ...t } : x)),
+   562→        })),
+   563→      deleteDailyTask: (id) =>
+   564→        set((s) => ({ dailyTasks: s.dailyTasks.filter((x) => x.id !== id) })),
+   565→      toggleDailyTask: (id) =>
+   566→        set((s) => ({
+   567→          dailyTasks: s.dailyTasks.map((x) =>
+   568→            x.id === id
+   569→              ? { ...x, completed: !x.completed, completedAt: !x.completed ? nowIso() : undefined }
+   570→              : x
+   571→          ),
+   572→        })),
+   573→      archiveDailyTask: (id, archived) =>
+   574→        set((s) => ({
+   575→          dailyTasks: s.dailyTasks.map((x) =>
+   576→            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+   577→          ),
+   578→        })),
+   579→
+   580→      // ===== Settings =====
+   581→      updateSettings: (patch) =>
+   582→        set((s) => ({ settings: { ...s.settings, ...patch } })),
+   583→      setPCOS: (patch) =>
+   584→        set((s) => ({ settings: { ...s.settings, pcos: { ...s.settings.pcos, ...patch } } })),
+   585→      setSecurity: (patch) =>
+   586→        set((s) => ({ settings: { ...s.settings, security: { ...s.settings.security, ...patch } } })),
+   587→      setAppearance: (patch) =>
+   588→        set((s) => ({ settings: { ...s.settings, appearance: { ...s.settings.appearance, ...patch } } })),
+   589→
+   590→      exportData: () => {
+   591→        const s = get();
+   592→        const payload = {
+   593→          version: "5.0",
+   594→          hydration: s.hydration,
+   595→          hydrationLogs: s.hydrationLogs,
+   596→          moodLogs: s.moodLogs,
+   597→          mood: s.mood,
+   598→          cycleEntries: s.cycleEntries,
+   599→          journalEntries: s.journalEntries,
+   600→          wishlistItems: s.wishlistItems,
+   601→          reminders: s.reminders,
+   602→          careTasks: s.careTasks,
+   603→          dailyTasks: s.dailyTasks,
+   604→          settings: s.settings,
+   605→          exportedAt: new Date().toISOString(),
+   606→        };
+   607→        return JSON.stringify(payload, null, 2);
+   608→      },
+   609→
+   610→      importData: (json, mode = "overwrite") => {
+   611→        try {
+   612→          const parsed = JSON.parse(json);
+   613→          if (mode === "merge") {
+   614→            // Merge: keep existing, add new (dedupe by id)
+   615→            set((s) => ({
+   616→              cycleEntries: dedupe([...s.cycleEntries, ...(parsed.cycleEntries ?? [])]),
+   617→              journalEntries: dedupe([...s.journalEntries, ...(parsed.journalEntries ?? [])]),
+   618→              wishlistItems: dedupe([...s.wishlistItems, ...(parsed.wishlistItems ?? [])]),
+   619→              reminders: dedupe([...s.reminders, ...(parsed.reminders ?? [])]),
+   620→              careTasks: dedupe([...s.careTasks, ...(parsed.careTasks ?? [])]),
+   621→              dailyTasks: dedupe([...s.dailyTasks, ...(parsed.dailyTasks ?? [])]),
+   622→              hydrationLogs: dedupe([...s.hydrationLogs, ...(parsed.hydrationLogs ?? [])]),
+   623→              moodLogs: dedupe([...s.moodLogs, ...(parsed.moodLogs ?? [])]),
+   624→              hydration: parsed.hydration ?? s.hydration,
+   625→              mood: parsed.mood ?? s.mood,
+   626→              settings: parsed.settings ? { ...s.settings, ...parsed.settings } : s.settings,
+   627→            }));
+   628→          } else {
+   629→            // Overwrite (default)
+   630→            set((s) => ({
+   631→              hydration: parsed.hydration ?? s.hydration,
+   632→              hydrationLogs: parsed.hydrationLogs ?? s.hydrationLogs,
+   633→              moodLogs: parsed.moodLogs ?? s.moodLogs,
+   634→              mood: parsed.mood ?? s.mood,
+   635→              cycleEntries: parsed.cycleEntries ?? [],
+   636→              journalEntries: parsed.journalEntries ?? [],
+   637→              wishlistItems: parsed.wishlistItems ?? [],
+   638→              reminders: parsed.reminders ?? [],
+   639→              careTasks: parsed.careTasks ?? [],
+   640→              dailyTasks: parsed.dailyTasks ?? [],
+   641→              settings: parsed.settings ? { ...defaultSettings, ...parsed.settings } : s.settings,
+   642→            }));
+   643→          }
+   644→          return true;
+   645→        } catch {
+   646→          return false;
+   647→        }
+   648→      },
+   649→
+   650→      resetAll: () =>
+   651→        set(() => ({
+   652→          ...defaultData,
+   653→          theme: get().theme,
+   654→          settings: defaultSettings,
+   655→        })),
+   656→    }),
+   657→    {
+   658→      name: "abantika-wellness-v5",
+   659→      storage: createJSONStorage(() => localStorage),
+   660→      version: 5,
+   661→      // Migrate from v2 storage key
+   662→      migrate: (persisted: any, version: number) => {
+   663→        if (!persisted) return persisted;
+   664→        // Ensure new fields exist for older data
+   665→        return {
+   666→          ...persisted,
+   667→          careTasks: persisted.careTasks ?? [],
+   668→          dailyTasks: persisted.dailyTasks ?? [],
+   669→          settings: persisted.settings
+   670→            ? { ...defaultSettings, ...persisted.settings }
+   671→            : defaultSettings,
+   672→        };
+   673→      },
+   674→      partialize: (s) => ({
+   675→        theme: s.theme,
+   676→        hydration: s.hydration,
+   677→        hydrationLogs: s.hydrationLogs,
+   678→        moodLogs: s.moodLogs,
+   679→        mood: s.mood,
+   680→        cycleEntries: s.cycleEntries,
+   681→        journalEntries: s.journalEntries,
+   682→        wishlistItems: s.wishlistItems,
+   683→        reminders: s.reminders,
+   684→        careTasks: s.careTasks,
+   685→        dailyTasks: s.dailyTasks,
+   686→        settings: s.settings,
+   687→      }),
+   688→    }
+   689→  )
+   690→);
+   691→
+   692→/** Hook that tracks whether the persisted store has hydrated on the client. */
+   693→export function useHydrated(): boolean {
+   694→  const [hydrated, setHydrated] = React.useState(false);
+   695→  React.useEffect(() => {
+   696→    setHydrated(true);
+   697→  }, []);
+   698→  return hydrated;
+   699→}
+   700→

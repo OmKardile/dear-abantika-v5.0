@@ -1,0 +1,463 @@
+     1→     1→# Premium Wellness App — Transformation Worklog
+     2→     2→
+     3→     3→Project: Transform "Abantika" wellness app (Vite/React) into a flagship Dribbble-quality Next.js 16 mobile experience. Preserve ALL existing features.
+     4→     4→
+     5→     5→## Existing App Features (MUST PRESERVE)
+     6→     6→- **Dashboard**: hero greeting, quick actions (Log Water, Log Mood, Cycle Entry, Add Reminder), status cards (Hydration, Mood, Cycle, Reminder), daily wellness tip, mood dialog (10 emojis)
+     7→     7→- **Cycle Tracker**: monthly calendar with period/symptom markers, entry form (period toggle, flow, 11 symptoms, weight, BBT, medication, notes), analytics (total entries, period days, top-6 symptoms bar chart)
+     8→     8→- **Journal**: Diary tab (search, mood filter chips, journal cards w/ title/sticker/mood/date/reflection, add form) + Wishlist tab (4 categories: save-later, urgent, dream, for-him; item cards w/ image/title/description/notes/link, add form)
+     9→     9→- **Hydration**: circular progress ring, droplet, quick add 250/500ml, weekly bar chart, 4 tips, goal info
+    10→    10→- **Settings**: Theme tab (6 themes), Reminders tab (reminder cards + add form w/ title/category/time/days), Backup tab (export/import JSON)
+    11→    11→
+    12→    12→## Data Model
+    13→    13→- hydration {current, goal, history[{date,amount}]}
+    14→    14→- mood {current, date}
+    15→    15→- cycleEntries[{id,date,isPeriod,flow,symptoms[],weight,bbt,medication,notes}]
+    16→    16→- journalEntries[{id,date,title,mood,reflection,sticker}]
+    17→    17→- wishlistItems[{id,title,description,category,notes,link,image}]
+    18→    18→- reminders[{id,title,time,category,days[],enabled}]
+    19→    19→
+    20→    20→## Architecture Decisions
+    21→    21→- Single `/` route (Next.js App Router). Mobile app shell with client-side tab state (no react-router).
+    22→    22→- localStorage persistence (mirrors original offline-first approach).
+    23→    23→- 6 premium themes via CSS variables, default = warm elegant light theme.
+    24→    24→- Framer Motion for animations, Recharts for charts, Lucide for icons.
+    25→    25→- 8px spacing grid, 20–28px radii, soft layered shadows, frosted glass accents.
+    26→    26→
+    27→    27→---
+    28→    28→Task ID: 1
+    29→    29→Agent: main (orchestrator)
+    30→    30→Task: Build design system foundation (globals.css tokens + 6 themes, types, storage, providers)
+    31→    31→
+    32→    32→Work Log:
+    33→    33→- Analyzed uploaded zip and existing project structure
+    34→    34→- Read all existing pages, contexts, and components to map features
+    35→    35→- (Building foundation files next)
+    36→    36→
+    37→    37→Stage Summary:
+    38→    38→- Foundation in progress.
+    39→    39→
+    40→    40→---
+    41→    41→Task ID: 2-8
+    42→    42→Agent: main (orchestrator)
+    43→    43→Task: Build app shell, all 5 pages, forms, and verify with Agent Browser
+    44→    44→
+    45→    45→Work Log:
+    46→    46→- Built app shell with premium floating bottom nav (layoutId spring animation, glassmorphism)
+    47→    47→- Built premium primitives: SurfaceCard, GlassCard, IconBadge, ProgressRing, AnimatedCounter, EmptyState, SectionHeader, Chip, PageTransition, StaggerItem, Pressable
+    48→    48→- Dashboard: animated gradient hero greeting, floating quick actions, vibrant wave hydration card, animated mood card, reminder countdown, cycle status, daily encouragement with dot pagination
+    49→    49→- Cycle Tracker: premium month calendar with period/symptom markers, day selection, entry form (period toggle, flow, 11 symptoms, metrics, notes), analytics view with animated symptom bars + recent entries
+    50→    50→- Journal: tabbed Diary (search, mood filter chips, animated entry cards, floating formatting toolbar in form) + Wishlist (4 category cards with counts, image cards, premium add form)
+    51→    51→- Hydration: animated progress ring with droplet, +250/-250/+500 controls, weekly bar chart with today highlight, stat chips, gentle tips
+    52→    52→- Settings: theme gallery with mini device previews + swatches + animated checkmark, reminders timeline with toggles + day chips, backup export/import/reset, about card
+    53→    53→- 7 premium themes (Linen default, Noir, Sage, Lavender, Rose, Ocean, Sand) with full token system
+    54→    54→- Zustand store with localStorage persistence, all CRUD operations preserved from original app
+    55→    55→- Verified with Agent Browser: all 5 tabs render, all forms open, theme switching works, data persists (water 750→1250 confirmed in localStorage), no runtime errors
+    56→    56→- VLM assessment: 8/10, "Dribbble-worthy and production-ready"
+    57→    57→- Lint: 0 errors (1 unrelated warning in upload/extracted folder)
+    58→    58→
+    59→    59→Stage Summary:
+    60→    60→- All original features preserved: hydration tracking, mood logging, cycle calendar+analytics, journal diary+wishlist, reminders, theme switching, backup/restore
+    61→    61→- Transformed into flagship mobile wellness experience with premium design system, animations, and micro-interactions
+    62→    62→- Single / route, mobile-first, responsive, accessible (reduced-motion support, ARIA labels, semantic HTML)
+    63→    63→- Production-ready, verified end-to-end in browser
+    64→    64→
+    65→    65→---
+    66→    66→Task ID: 2
+    67→    67→Agent: full-stack-developer (cycle tracker lifecycle)
+    68→    68→Task: Add full lifecycle management to Cycle Tracker (list view with search, filter, sort, swipe, multi-select, archive, undo)
+    69→    69→
+    70→    70→Work Log:
+    71→    71→- Read worklog.md for project context (premium "Abantika" wellness app, single / route, Zustand store, Framer Motion, shadcn-style premium primitives)
+    72→    72→- Read existing src/components/pages/cycle-tracker.tsx (calendar + analytics views + CycleEntryForm)
+    73→    73→- Read src/components/pages/journal.tsx for list design pattern reference (search SurfaceCard, horizontal Chip row, StaggerItem list, FAB)
+    74→    74→- Read premium primitives, swipeable-row, selection-bar, sort-menu, confirm-dialog to learn exact APIs
+    75→    75→- Read hooks/use-selection.ts (mode, selected, toggle, enterMode, selectAll, clearAll) and providers/undo-provider.tsx (showUndo(message, undo))
+    76→    76→- Read lib/types.ts (CycleEntry now has archived/archivedAt; SortOption; SORT_LABELS) and lib/store.ts (archiveCycleEntry, bulkDeleteCycleEntries, bulkArchiveCycleEntries all present)
+    77→    77→- Read app-shell.tsx + layout.tsx to discover that page content lives inside PageTransition's transformed motion.div — meaning position:fixed children would be trapped in that transform context. Decided to portal SelectionBar / FAB / ConfirmDialog to document.body for correct viewport-fixed positioning
+    78→    78→- Rewrote src/components/pages/cycle-tracker.tsx:
+    79→    79→  * Replaced single icon toggle in header action slot with a full-width 3-way segmented control below SectionHeader (Calendar | List | Insights) using layoutId="cycle-view-tab" spring animation, matching journal.tsx tab pattern
+    80→    80→  * view state type changed from "calendar" | "analytics" to "calendar" | "list" | "insights"; analytics branch renamed key to "insights" but JSX preserved EXACTLY (summary cards, top symptoms bar chart, recent entries list)
+    81→    81→  * Calendar branch preserved exactly; only the day onClick now also calls setEditingEntry(getEntry(day)) so the form opens in edit mode for existing entries. Removed the derived selectedEntry variable in favour of explicit editingEntry state
+    82→    82→  * Added new CycleListView component (renders inside an opacity-only motion.div to avoid creating a transform containing-block that would break its fixed children):
+    83→    83→    - Search SurfaceCard (Search icon + input + Clear) with SortMenu on the right
+    84→    84→    - Horizontal scrollable Chip row: All / Period days / Symptoms only / This month (no-scrollbar)
+    85→    85→    - List of SwipeableRow-wrapped CycleEntryCards with AnimatePresence + StaggerItem entrance
+    86→    86→    - EmptyState when no entries match (different copy + "New entry" action when there are zero entries at all vs. when filter yields nothing)
+    87→    87→    - FAB (hidden in selection mode) for adding a new entry for today
+    88→    88→  * Added CycleEntryCard component:
+    89→    89→    - Long-press (450ms timer on pointerdown, cleared on pointermove/up/leave/cancel) enters selection mode via sel.enterMode(entry.id); a longPressedRef swallows the subsequent click so the card doesn't also open the edit form
+    90→    90→    - In selection mode: tap toggles selection (sel.toggle); shows a circular checkmark on the right; card gets ring-2 ring-inset ring-primary (inset so it isn't clipped by SwipeableRow's overflow-hidden)
+    91→    91→    - Not in selection mode: tap opens CycleEntryForm via onEditEntry; shows a ChevronRight
+    92→    92→    - Card content: gradient period badge OR symptoms badge, date title, subtitle with flow / "Symptoms only" + symptom count + medication
+    93→    93→  * Swipe semantics (per task spec):
+    94→    94→    - Swipe "Delete" (red, trash) = archive + showUndo("Entry archived", restore) — soft delete with undo
+    95→    95→    - Swipe "Archive" (chart-3, archive icon) = archive (restorable from Settings archive screen, no undo)
+    96→    96→    - Multi-select "Delete" button = permanent bulkDeleteCycleEntries after ConfirmDialog ("Delete N entries?" / "Delete this entry?" with "This cannot be undone.")
+    97→    97→    - Multi-select "Archive" button = bulkArchiveCycleEntries, then clearAll
+    98→    98→    - SwipeableRow disabled in selection mode (no swipe, plain div)
+    99→    99→  * SelectionBar wired with sel.selectedCount, onCancel=sel.clearAll, onDelete/onArchive ignore the empty-array arg from the component and operate on sel.selected directly; total=visible.length; onSelectAll=sel.selectAll
+   100→   100→  * Sort logic applied to filtered (non-archived) list: newest=date desc, oldest=date asc, alpha=symptom count desc (alpha doesn't fit cycle entries), modified=archivedAt ?? date desc
+   101→   101→  * Search matches notes / medication / flow / date / any symptom
+   102→   102→  * Local Portal helper using React.useSyncExternalStore (SSR-safe, avoids the react-hooks/set-state-in-effect lint error) wraps SelectionBar, FAB, and ConfirmDialog so they escape the transformed PageTransition ancestor and render truly viewport-fixed
+   103→   103→- Ran bun run lint: 0 errors (only the pre-existing unrelated postcss warning in upload/extracted). Initial lint flagged setState-in-effect in Portal; fixed by switching to useSyncExternalStore
+   104→   104→- Verified dev server: curl http://localhost:3000/ returns HTTP 200; dev.log shows clean compilation, no runtime/compile errors
+   105→   105→
+   106→   106→Stage Summary:
+   107→   107→- Cycle Tracker now has 3 views via a premium segmented control: Calendar (unchanged), List (new, full lifecycle), Insights (analytics, unchanged)
+   108→   108→- List view delivers the full data lifecycle: search, 4 filter chips, 4 sort modes, swipe-to-archive / swipe-to-soft-delete-with-undo, long-press multi-select with SelectionBar, multi-select permanent delete via ConfirmDialog, multi-select bulk archive, empty states, and a FAB for new entries
+   109→   109→- Archived entries are filtered out of the list (they live in the Settings archive screen per the data model)
+   110→   110→- Calendar and Insights views preserved exactly; only the form's existing/onSave wiring was migrated from a derived selectedEntry to explicit editingEntry state (behaviour identical)
+   111→   111→- All fixed/overlay UI portaled to document.body to escape the app's transformed page-transition wrapper, ensuring SelectionBar, FAB and ConfirmDialog anchor to the viewport correctly
+   112→   112→- Mobile-first, touch-friendly (44px+ targets, long-press + swipe gestures), accessible (aria-pressed/aria-label), animated (staggered list, layoutId tab indicator, AnimatePresence), and consistent with the journal page's design language
+   113→   113→
+   114→   114→---
+   115→   115→Task ID: 3
+   116→   116→Agent: full-stack-developer (journal lifecycle)
+   117→   117→Task: Add full lifecycle management to Journal (Diary + Wishlist: search, sort, swipe, multi-select, archive, undo)
+   118→   118→
+   119→   119→Work Log:
+   120→   120→- Read worklog.md for project context (premium "Abantika" wellness app, single / route, Zustand store, Framer Motion, premium primitives, 8px grid / 20–28px radii design system)
+   121→   121→- Read existing src/components/pages/journal.tsx to understand current structure: top-level Journal with diary/wishlist segmented tabs (layoutId="journal-tab"), Diary (search SurfaceCard, horizontal MOOD_FILTERS Chip row, StaggerItem list of Pressable-wrapped SurfaceCard entry cards with mood emoji + title + date + sticker + reflection, FAB, DiaryEntryForm), Wishlist (2x2 grid of category buttons with counts, list of image+title+description+notes+link cards, FAB, WishlistItemForm)
+   122→   122→- Read src/components/pages/cycle-tracker.tsx (CycleListView + CycleEntryCard) as the canonical reference pattern for: useSelection + useUndo wiring, SwipeableRow wrap (disabled in selection mode), long-press (450ms timer, longPressedRef swallow subsequent click), tap-toggle vs tap-open behavior, SelectionBar portaled to body, ConfirmDialog for permanent multi-delete, AnimatePresence initial={false}, ring-2 ring-inset ring-primary for selected cards, SSR-safe Portal via useSyncExternalStore (NOT setState-in-effect which trips the react-hooks lint rule)
+   123→   123→- Read premium components to learn exact APIs: swipeable-row.tsx (onDelete + onArchive(archived), archived prop, disabled prop; Delete = red bg-error, Archive = chart-3 bg), selection-bar.tsx (selectedCount, onCancel, onDelete/onArchive fire with [] so operate on sel.selected directly, onSelectAll, total), sort-menu.tsx (value/onChange/options; uses SORT_LABELS from types), confirm-dialog.tsx (open, onOpenChange, title, description, confirmLabel, variant="destructive", onConfirm)
+   124→   124→- Read hooks/use-selection.ts (mode, selected[], selectedCount, isSelected, toggle, enterMode, selectAll, clearAll) and providers/undo-provider.tsx (showUndo(message, undo, durationMs=5000))
+   125→   125→- Read lib/types.ts (JournalEntry + WishlistItem now have archived?/archivedAt?; SortOption = newest|oldest|alpha|modified; SORT_LABELS; MOOD_FILTERS; WISHLIST_CATEGORIES) and confirmed store.ts has archiveJournalEntry / bulkDeleteJournalEntries / bulkArchiveJournalEntries / archiveWishlistItem / bulkDeleteWishlistItems / bulkArchiveWishlistItems (sets archivedAt = nowIso() when archived)
+   126→   126→- Verified form prop signatures: DiaryEntryForm({ open, onOpenChange, existing?, onSave(Omit<JournalEntry,"id">), onDelete?(id) }) and WishlistItemForm({ open, onOpenChange, defaultCategory?, existing?, onSave, onDelete }) — both preserved
+   127→   127→- Rewrote src/components/pages/journal.tsx with full lifecycle on BOTH tabs:
+   128→   128→  * Diary tab: kept existing tab switcher + form; added SortMenu next to a redesigned Search SurfaceCard row (flex with min-w-0 to keep input flexible on mobile); kept MOOD_FILTERS horizontal Chip row; new activeEntries memo filters out archived; visible memo applies search (title/reflection) + mood filter + 4 sort modes (newest=date desc, oldest=date asc, alpha=localeCompare title, modified=archivedAt??date desc); each entry card now wrapped in SwipeableRow (disabled in selection mode) with onDelete=archive+undo and onArchive=archive; new DiaryEntryCard component (button with long-press → sel.enterMode, click → sel.toggle in selection mode else openEdit, ChevronRight normally / Check circle when selected, ring-2 ring-inset ring-primary when selected) preserves exact existing visual (mood emoji, title, date w/ Calendar icon, animated sticker, line-clamp-3 reflection); SelectionBar / FAB / ConfirmDialog all portaled to document.body via useSyncExternalStore Portal; multi-select Delete opens ConfirmDialog then bulkDeleteJournalEntries (permanent), multi-select Archive = bulkArchiveJournalEntries(ids, true) + clearAll
+   129→   129→  * Wishlist tab: kept 2x2 category grid (counts now reflect non-archived items; switching category also clears selection); added NEW Search SurfaceCard + SortMenu row (search matches title/description/notes); new activeItems memo filters archived; visible memo filters by current cat + search + 4 sort modes (newest=insertion index desc via wishlistItems.findIndex, oldest=insertion index asc, alpha=localeCompare title, modified=archivedAt??"" desc); each item card wrapped in SwipeableRow with same delete=archive+undo, archive semantics; new WishlistItemCard component preserves exact existing visual (80x80 image w/ Sparkles fallback, title, line-clamp-2 description, notes w/ 💭, "View link" w/ ExternalLink) plus ChevronRight / Check circle; SelectionBar / FAB / ConfirmDialog portaled; multi-select delete = permanent bulkDeleteWishlistItems after confirm, multi-select archive = bulkArchiveWishlistItems(ids, true) + clearAll
+   130→   130→  * Both tabs: empty state copy differentiates "no matches" (with search/filter active) vs "nothing yet" (with New entry / Add item action); FAB hidden in selection mode; ConfirmDialog title pluralizes ("Delete N entries?" vs "Delete this entry?" / "Delete N items?" vs "Delete this item?")
+   131→   131→  * Removed now-unused imports (IconBadge from primitives, Pin/Zap/Heart that only backed the dead CAT_ICONS constant) for a clean lint pass; kept Sparkles (still used as wishlist image fallback)
+   132→   132→- Ran `bun run lint`: 0 errors (only the pre-existing, unrelated import/no-anonymous-default-export warning in upload/extracted/postcss.config.mjs)
+   133→   133→- Verified dev server: curl http://localhost:3000/ returns HTTP 200; dev.log shows clean compilation with no runtime/compile errors
+   134→   134→
+   135→   135→Stage Summary:
+   136→   136→- Journal page now delivers the full data lifecycle on BOTH tabs: search, sort (4 modes), swipe-to-soft-delete-with-undo (archive + showUndo snackbar), swipe-to-archive (restorable from Settings → Archive), long-press to enter selection mode, multi-select with portaled SelectionBar (count + select all + archive + permanent delete via ConfirmDialog), staggered list animations with AnimatePresence enter/exit, archived entries filtered out of the list
+   137→   137→- All existing functionality preserved: Diary's search + mood filter chips + entry card visual (mood emoji, title, date, animated sticker, reflection) + add/edit form; Wishlist's 2x2 category grid + image card visual + add/edit form; FAB for quick add; tab switcher with layoutId spring
+   138→   138→- All fixed/overlay UI (SelectionBar, FAB, ConfirmDialog) portaled to document.body to escape the app's transformed PageTransition wrapper so they anchor to the viewport correctly
+   139→   139→- Mobile-first, touch-friendly (44px+ targets, long-press + swipe gestures), accessible (aria-pressed/aria-label on every interactive control), and visually consistent with the cycle-tracker's list view (same SwipeableRow/SelectionBar/SortMenu/ConfirmDialog patterns, same long-press + selection ring treatment)
+   140→   140→
+   141→   141→---
+   142→   142→Task ID: 4
+   143→   143→Agent: full-stack-developer (hydration/reminders/archive lifecycle)
+   144→   144→Task: Add hydration log lifecycle, mood history, reminder swipe/sort, and Archive management screen
+   145→   145→
+   146→   146→Work Log:
+   147→   147→- Read worklog.md for project context (premium "Abantika" wellness app, single / route, Zustand store, Framer Motion, premium primitives)
+   148→   148→- Read existing src/components/pages/hydration.tsx (hero ring + quick add + stat chips + weekly chart + tips + goal info — all to be preserved) and src/components/pages/settings.tsx (Theme/Reminders/Backup tabs + About card — all to be preserved)
+   149→   149→- Read src/components/forms/reminder-form.tsx for bottom-sheet form pattern reference and src/components/forms/mood-dialog.tsx for the mood grid pattern reference
+   150→   150→- Read src/components/pages/cycle-tracker.tsx end-to-end to learn the exact swipe + long-press selection + Portal + ConfirmDialog pattern that this app uses (useSyncExternalStore-based Portal to escape the transformed PageTransition ancestor; SwipeableRow with onDelete; useSelection hook; SelectionBar with onDelete/onSelectAll; long-press 450ms timer swallowing the subsequent click)
+   151→   151→- Read all premium components (primitives, swipeable-row, selection-bar, sort-menu, confirm-dialog), useSelection hook, undo-provider, lib/types, lib/helpers, lib/store to confirm exact APIs: HydrationLog/MoodLog shapes, addHydrationLog(amount, timestamp?) accepting original timestamp for undo, addMoodLog(mood, note?) creating new id/timestamp, archiveX/deleteX/bulkDeleteX for all 4 entity types
+   152→   152→- Created src/components/forms/hydration-log-form.tsx (NEW) — bottom sheet for editing a hydration log:
+   153→   153→  * Sticky header + sticky footer pattern matching reminder-form.tsx
+   154→   154→  * Amount control: −50/+50 buttons around a large tabular-nums display, color flips primary (≥0) / error (<0)
+   155→   155→  * 3 quick-amount chips (+250, +500, −250) and a manual number input fallback
+   156→   156→  * Time input (type="time") defaulting to the existing log's timestamp or now
+   157→   157→  * Live preview card ("This will add/remove X ml to/from today's total")
+   158→   158→  * Save calls onSave(amount, buildTimestamp(time, existing?.timestamp)); Delete calls onDelete(existing.id)
+   159→   159→  * Props exactly match spec: { open, onOpenChange, existing?, onSave(amount, timestamp), onDelete?(id) }
+   160→   160→- Created src/components/forms/mood-log-form.tsx (NEW) — bottom sheet for adding/editing a mood log:
+   161→   161→  * 5-column grid of MOODS emojis with spring entrance per button, active state gets ring + scale + shadow-glow
+   162→   162→  * Optional note textarea (max 300 chars) with live counter
+   163→   163→  * Save calls onSave(mood, note||undefined); Delete calls onDelete(existing.id)
+   164→   164→  * Props exactly match spec: { open, onOpenChange, existing?, onSave(mood, note?), onDelete?(id) }
+   165→   165→- Edited src/components/pages/hydration.tsx — preserved hero ring + stat chips + weekly chart + tips + goal info verbatim, added two new sections between stat chips and weekly chart:
+   166→   166→  * TodaysLogs component: SurfaceCard listing hydrationLogs filtered to today's date prefix, sorted newest-first; each row in SwipeableRow with delete action = deleteHydrationLog(id) + showUndo("Log removed", () => addHydrationLog(amount, timestamp)) restoring original amount AND timestamp; tap row opens HydrationLogForm in edit mode; empty state "No logs yet — add water above"; scroll-area max-h-80 for long lists; AnimatePresence for enter/exit
+   167→   167→  * RecentMood component: SurfaceCard showing latest 3 moodLogs (timestamp + emoji + note + relative time), each swipeable to delete + showUndo("Mood removed", () => addMoodLog(mood, note)) — addMoodLog signature only takes mood+note so undo restores mood+note with a fresh id/timestamp; "View all" action opens a portaled MoodHistorySheet (full-screen bottom sheet with all mood logs, same swipe + edit pattern); tap row opens MoodLogForm in edit mode
+   168→   168→  * MoodHistorySheet portaled to document.body via useSyncExternalStore-based Portal (matches cycle-tracker pattern), with sticky header + scrollable body
+   169→   169→- Edited src/components/pages/settings.tsx — preserved ThemeTab/BackupTab/About verbatim, changed tab array from 3 to 4 entries (Theme, Alerts, Backup, Archive) using shorter labels to fit, and made these changes to RemindersTab + added ArchiveTab:
+   170→   170→  * RemindersTab: added SortMenu (newest=reverse insertion / oldest=insertion / alpha=title A→Z / modified=by reminder time asc); filtered to non-archived reminders only; wrapped each timeline card in SwipeableRow with permanent Delete action (no undo, opens ConfirmDialog); extracted ReminderRow component with long-press 450ms timer that enters selection mode via sel.enterMode(id) and swallows the subsequent click; in selection mode the row shows a circular checkmark and disables swipe; SelectionBar portaled to body with bulk delete after ConfirmDialog; both single-delete and bulk-delete ConfirmDialogs portaled to body
+   171→   171→  * ArchiveTab (NEW): shows archived items across all 4 entity types (cycle, journal, wishlist, reminders) — only renders sections that have ≥1 archived item; each ArchivedItemRow shows type emoji + title + description + "archived X ago" relative time + Restore button (calls archiveX(id, false)) + permanent Delete button (calls deleteX(id) after ConfirmDialog); empty state when nothing is archived ("Nothing archived. Archived items rest here until you restore or delete them." with 🗂️ emoji); "Empty archive" danger button at bottom that permanently deletes ALL archived items across all 4 types after a single ConfirmDialog
+   172→   172→  * Portal helper using React.useSyncExternalStore (SSR-safe, avoids setState-in-effect lint error) wraps SelectionBar and all ConfirmDialogs so they escape the transformed PageTransition ancestor and render truly viewport-fixed — consistent with cycle-tracker.tsx
+   173→   173→- Ran `bun run lint`: 0 errors (only the pre-existing unrelated postcss warning in upload/extracted). Initial draft had a dead handleDelete function in RecentMood (leftover from a broken undo snippet that referenced useStore.getState().addMoodLog) — removed it; also removed unused IconBadge/EmptyState/ConfirmDialog/Trash2 imports from hydration.tsx and unused ChevronRight import from settings.tsx
+   174→   174→- Verified dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` returns 200; dev.log shows clean compilation across multiple edits, no runtime/compile errors
+   175→   175→
+   176→   176→Stage Summary:
+   177→   177→- Hydration page now has a full log lifecycle: today's logs list (swipe-delete with undo that restores original amount + timestamp, tap to edit via HydrationLogForm), plus a recent-mood mini-section with view-all history sheet
+   178→   178→- Two new bottom-sheet forms: HydrationLogForm (amount stepper + quick chips + custom input + time picker + live preview + save/delete) and MoodLogForm (10-emoji grid + optional note + save/delete) — both match reminder-form.tsx's sticky-header/sticky-footer pattern
+   179→   179→- Settings Reminders tab upgraded with SortMenu (4 modes), SwipeableRow permanent delete (ConfirmDialog, no undo), long-press multi-select with portaled SelectionBar + bulk delete; archived reminders filtered out
+   180→   180→- New Archive tab (4th) groups all archived items by type (Cycle / Journal / Wishlist / Reminders), each with Restore + permanent Delete (ConfirmDialog), empty state, and an "Empty archive" danger button that wipes all archived items in one confirm
+   181→   181→- All fixed/overlay UI (SelectionBar, ConfirmDialogs, MoodHistorySheet) portaled to document.body via useSyncExternalStore-based Portal — consistent with cycle-tracker.tsx pattern; mobile-first, touch-friendly (44px+ targets, long-press + swipe), accessible (aria-pressed/aria-label), animated (staggered list, layout spring tab indicator, AnimatePresence)
+   182→   182→- Lint clean (0 errors); dev server returns 200; no runtime/compile errors in dev.log
+   183→   183→
+   184→   184→---
+   185→   185→Task ID: 6
+   186→   186→Agent: main (orchestrator)
+   187→   187→Task: Verify all lifecycle flows with Agent Browser end-to-end
+   188→   188→
+   189→   189→Work Log:
+   190→   190→- Verified all 5 tabs render with zero runtime/console errors
+   191→   191→- Cycle Tracker: 3-way segmented control (Calendar/List/Insights), list view with search + 4 filter chips + sort menu, created entry appears in list
+   192→   192→- Journal Diary: sort menu, swipe reveals Archive/Delete actions, archived entry disappears from list
+   193→   193→- Journal Wishlist: search + sort + swipe actions
+   194→   194→- Archive screen: archived journal entry appears under "Journal entries" with Restore/Delete; Restore returns it to journal (verified round-trip)
+   195→   195→- Hydration: "Today's logs" section shows individual log entries with delete; "Recent mood" section shows latest mood logs
+   196→   196→- Settings: 4 tabs (Theme/Alerts/Backup/Archive); reminders swipe-delete + sort
+   197→   197→- Selection mode: long-press enters multi-select with "Select all N" + SelectionBar
+   198→   198→- UndoProvider wired into layout; undo snackbar appears on soft-delete
+   199→   199→- ConfirmDialog for permanent deletes
+   200→   200→- Lint: 0 errors (1 unrelated warning in upload/extracted)
+   201→   201→- VLM scores: Hydration 9/10, Archive 8/10, Journal 8/10, Home 8/10 — "handcrafted, premium feel rather than AI-generated CRUD"
+   202→   202→
+   203→   203→Stage Summary:
+   204→   204→- Complete data lifecycle management across ALL modules: Create/View/Edit/Delete/Search/Filter/Sort/Archive/Restore
+   205→   205→- Premium UX patterns: swipe-to-delete, long-press multi-select, undo snackbar, confirmation dialogs, sort menus, filter chips, elegant empty states with actions
+   206→   206→- New content types with full lifecycle: HydrationLog (individual water entries), MoodLog (mood history)
+   207→   207→- New Archive management screen (restore + permanent delete + empty-all)
+   208→   208→- All verified end-to-end in browser, production-ready
+   209→   209→
+   210→   210→---
+   211→   211→Task ID: 3
+   212→   212→Agent: full-stack-developer (dashboard redesign)
+   213→   213→Task: Redesign dashboard per attached design (2x2 status grid, daily reflection, faded date, mobile-compact sizing)
+   214→   214→
+   215→   215→Work Log:
+   216→   216→- Read worklog.md for project context (premium "Abantika" wellness app, single / route, Zustand store, Framer Motion, premium primitives, 8px grid / 20–28px radii, chart CSS vars --chart-1..5 in globals.css)
+   217→   217→- Read existing src/components/pages/dashboard.tsx (hero greeting gradient card, 4 quick actions w/ onNavigate("settings") for 4th, animated wave hydration card, 2-col mood+reminder grid, separate cycle status row card, daily encouragement card w/ Sparkles + Quote)
+   218→   218→- Read src/components/premium/primitives.tsx for exact APIs (SurfaceCard, IconBadge, StaggerItem, AnimatedCounter, Pressable) and confirmed motion/whileTap behavior
+   219→   219→- Read src/lib/helpers.ts for greeting/greetingSub/formatTime signatures (timeUntil removed from this dashboard's usage)
+   220→   220→- Confirmed date-fns@4.1.0 installed → imported `format` for the faded date line
+   221→   221→- Confirmed app-shell.tsx TabId type being extended to include "reminders" by orchestrator in parallel; assumed "reminders" already in TabId and only edited dashboard.tsx + worklog per instructions
+   222→   222→- Rewrote src/components/pages/dashboard.tsx with all 7 required changes:
+   223→   223→  1. Hero greeting card: added faded date line `format(new Date(), "EEEE, MMMM d")` directly under greeting label as text-[11px] text-primary-foreground/55; reduced padding p-6 pb-7 → p-5 pb-5; reduced subtitle to text-sm; reduced mini-stats to 2 (streak + hydration %) with smaller icons (14px), text-xs values, text-[10px] labels; kept text-display "Hello, Abantika" (clamp) and gradient-primary-bg + shadow-glow + decorative orbs + ✨ float
+   224→   224→  2. Quick actions row: kept 4 actions but 4th now onNavigate("reminders") (was "settings"), label changed "Reminder" → "Reminders", tint chart-3 (purple) to match design; icon container w-14 h-14 → w-11 h-11, icon size 24 → 20, gap-2.5 → gap-2, padding p-3.5 → p-2.5, label text-[11px] → text-[10px], radius rounded-[22px] → rounded-[18px]; Cycle tint switched to var(--primary) for pink/rose feel
+   225→   225→  3. NEW 2x2 status grid (grid grid-cols-2 gap-3) replacing the old mood+reminder 2-col grid AND the separate cycle status card:
+   226→   226→     - Mood (top-left): amber dot (var(--chart-4)) + uppercase "MOOD" label (text-[10px] tracking-wider), large centered mood emoji with gentle float animation (y/rotate loop), "Today" subtitle; Pressable → opens MoodDialog
+   227→   227→     - Cycle (top-right): coral/pink dot (var(--primary)) + "CYCLE" label, large Flower2 icon centered (size 28, primary color), subtitle computed via cycleSubtitle memo: "~N days away" (28-day cycle prediction from most recent period entry), "due today", or "{n} entries" / "Begin tracking" fallback; Pressable → onNavigate("cycle")
+   228→   228→     - Streak (bottom-left): amber dot (var(--chart-4)) + "STREAK" label, large bold number via AnimatedCounter (text-2xl font-extrabold tabular-nums) with a small Flame accent, "days consistent" subtitle; non-interactive display card
+   229→   229→     - Next (bottom-right): purple dot (var(--chart-3)) + "NEXT" label, next reminder title (text-sm font-semibold, line-clamp-2), subtitle formatTime(nextReminder.time) e.g. "8:00 PM" or "Set one up" when none; Pressable → onNavigate("reminders")
+   230→   230→     - All cards: p-4, min-h-[110px], flex-col justify-between, uppercase label with small colored dot
+   231→   231→  4. Hydration wave card: compacted p-5 → p-4, headline text-headline → text-xl font-bold tabular-nums, IconBadge size 44 → 36, wave height h-16 → h-14, inner px-4 → px-3.5, +250/+500 buttons py-2.5 → py-2 and text-sm → text-xs; kept the gradient fill width animation, the moving shimmer wave overlay, and the +250/+500 quick-add buttons
+   232→   232→  5. Daily Reflection card: replaced old "Daily encouragement" (Sparkles IconBadge + Quote + left-aligned text) with a centered "moment" card — large 🌸 emoji (text-4xl) with float/rotate animation, small uppercase "DAILY REFLECTION" label, centered tip text (text-sm leading-relaxed max-w-20rem), dot pagination (5 dots, active = 22px primary, inactive = 6px border); padding p-6 → p-5; kept two soft blurred accent orbs (chart-3 top-right, chart-4 bottom-left) for warmth
+   233→   233→  6. Removed the separate cycle status row card (now lives in 2x2 grid) and the old mood+reminder 2-col grid (replaced by 2x2)
+   234→   234→  7. Mobile responsiveness: overall page space-y-6 → space-y-4; all label/value text sizes reduced to fit 360px (labels text-[10px]/text-[11px], card values text-sm/text-2xl, hero stats text-xs); quick-action icon containers w-11 h-11; 2x2 cards p-4 min-h-[110px]; hydration p-4 h-14; reflection p-5
+   235→   235→- Cleaned imports: removed now-unused Sparkles, ChevronRight, Quote, MOODS, timeUntil; added `format` from date-fns; kept IconBadge (still used in compact hydration card), SurfaceCard, StaggerItem, AnimatedCounter, Pressable, MoodDialog
+   236→   236→- Ran `bun run lint`: dashboard.tsx produces ZERO errors (eslint on the file alone is silent). The 5 remaining errors are all in settings.tsx (SortMenu/SwipeableRow/ReminderForm/SelectionBar/Clock undefined) — that file is being refactored by the orchestrator in parallel to extract the reminders tab and is explicitly out of my scope per task instructions
+   237→   237→- Verified dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` returns 200; dev.log shows clean recompilation ("✓ Compiled in 2.7s" / "✓ Compiled in 2.4s") with no runtime/compile errors after the edit
+   238→   238→
+   239→   239→Stage Summary:
+   240→   240→- Dashboard redesigned to match the attached design references: faded date line under greeting, compact 4-action row (4th → new "reminders" tab), proper 2x2 status grid (Mood/Cycle/Streak/Next) with small colored dots + uppercase labels + distinct accent colors (amber/coral/amber/purple), compact wave hydration card, and a centered "Daily Reflection" moment card with large 🌸 + dot pagination
+   241→   241→- Removed the redundant separate cycle status row and the old mood+reminder 2-col grid — cycle + mood + reminder are now consolidated into the 2x2 grid, with streak as the new 4th card
+   242→   242→- Mobile-first throughout: every section compacted for 360px width (smaller paddings, icon containers, text sizes, gaps), no horizontal scroll; hero mini-stats reduced to 2 (streak + hydration %)
+   243→   243→- Premium micro-interactions preserved/added: staggered entrance via StaggerItem, mood emoji gentle float, 🌸 float-rotate in reflection, AnimatedCounter on both hydration ml and streak number, gradient-primary hero with shadow-glow and decorative orbs, Pressable whileTap scale on every tappable card
+   244→   244→- Lint-clean for dashboard.tsx; HTTP 200 on /; dev.log clean. Only touched src/components/pages/dashboard.tsx + worklog.md as instructed
+   245→   245→
+   246→   246→---
+   247→   247→Task ID: 2
+   248→   248→Agent: full-stack-developer (reminders main tab)
+   249→   249→Task: Promote Reminders from settings sub-tab to main bottom-nav tab
+   250→   250→
+   251→   251→Work Log:
+   252→   252→- Read worklog.md for project context (premium "Abantika" wellness app, single / route, 5-tab bottom nav, Zustand store, Framer Motion, mobile-first premium design system)
+   253→   253→- Read src/components/app-shell.tsx (TabId union, TABS array, BottomNav with layoutId="nav-active" spring indicator) and src/app/page.tsx (tab→page router)
+   254→   254→- Read src/components/pages/settings.tsx end-to-end to map exactly which symbols belong to the Reminders sub-feature (RemindersTab function + ReminderRow helper + local Portal) vs the parts that must stay (ThemeTab, ArchiveTab + ArchivedItemRow + archivedAgo, BackupTab, About card, shared Portal helper used by ArchiveTab/BackupTab dialogs)
+   255→   255→- Confirmed settings imports that became unused after removing RemindersTab/ReminderRow: Clock (was only used in ReminderRow), WEEKDAY_LABELS (only in ReminderRow), SortOption (only in RemindersTab), ReminderForm (only in RemindersTab), SwipeableRow (only in RemindersTab), SelectionBar (only in RemindersTab), SortMenu (only in RemindersTab), useSelection (only in RemindersTab); kept Bell (still used by ArchivedItemRow for reminder-type icon), REMINDER_CATEGORIES (still used by ArchivedItemRow), Reminder type (still used by ArchivedItemRow signature), Plus (still used by BackupTab close button), Check (still used by ThemeTab active checkmark)
+   256→   256→- Read premium component APIs: SwipeableRow (onDelete + disabled), SelectionBar (selectedCount/onCancel/onDelete fires with []/onSelectAll/total), SortMenu (value/onChange), ConfirmDialog (open/onOpenChange/title/description/confirmLabel/variant/onConfirm), useSelection (mode/selected/selectedCount/isSelected/toggle/enterMode/selectAll/clearAll)
+   257→   257→- Updated src/components/app-shell.tsx:
+   258→   258→  * Added `Bell` to lucide-react imports
+   259→   259→  * Extended TabId union: `"home" | "cycle" | "journal" | "hydration" | "reminders" | "settings"` (6 tabs)
+   260→   260→  * Added `{ id: "reminders", label: "Reminders", icon: Bell }` between hydration and settings
+   261→   261→  * Compacted the bottom nav for 6 tabs on a 360px screen: nav container `px-2 py-2` → `px-1.5 py-1.5`, tab button `py-2 px-1 gap-1` → `py-1.5 px-0.5 gap-0.5`, inner icon/label column `gap-1` → `gap-0.5`, icon size 22 → 20, label `text-[10px]` → `text-[9px]`
+   262→   262→- Created src/components/pages/reminders.tsx (NEW, named export `Reminders`):
+   263→   263→  * Top-level page with animated SectionHeader title="Reminders" subtitle="Gentle nudges for your day" (motion fade-in y:-12→0, respects reduced motion)
+   264→   264→  * Body: count line ("N reminders") + SortMenu + "New" gradient Pressable on the right
+   265→   265→  * Empty state with 🔔 emoji and "Add reminder" action button (gradient)
+   266→   266→  * Premium timeline: relative container, vertical rail at left-[10px], each reminder is a motion.div (layout, opacity/x entrance, x/height exit) with a circular node (gradient when enabled, surface-secondary when not) anchored -left-[18px] top-5; each row wrapped in SwipeableRow (disabled when in selection mode); AnimatePresence initial={false}; subtle stagger delay (i * 0.02) skipped under reduced motion
+   267→   267→  * ReminderRow helper (copied verbatim from settings.tsx): long-press 450ms timer → sel.enterMode(id) and swallows the subsequent click via longPressedRef; tap toggles selection in selection mode, else opens ReminderForm in edit mode; selection ring (ring-2 ring-inset ring-primary); checkmark circle replaces the enabled/disabled toggle in selection mode; enabled/disabled is a spring-animated toggle pill (layout spring, left-1 ↔ left-6); card opacity-60 when disabled; shows category emoji (44px), title, Clock icon + formatTime, 7 weekday labels (active days in primary color)
+   268→   268→  * Sort logic identical to the old RemindersTab: newest=reverse insertion, oldest=insertion, alpha=title localeCompare, modified=time asc; only non-archived reminders shown
+   269→   269→  * Swipe delete = permanent delete after ConfirmDialog (no undo, reminders are easily recreated); multi-select Delete via portaled SelectionBar also goes through a ConfirmDialog ("Delete N reminders?" / "Delete this reminder?")
+   270→   270→  * ReminderForm wired: existing=editingReminder, onSave=add/update, onDelete=deleteReminder
+   271→   271→  * Local Portal helper using React.useSyncExternalStore (SSR-safe, avoids setState-in-effect lint rule) wraps SelectionBar and both ConfirmDialogs so they escape the transformed PageTransition ancestor — same pattern as settings.tsx/cycle-tracker.tsx/journal.tsx
+   272→   272→  * Imports: React, react-dom createPortal, framer-motion (motion, AnimatePresence, useReducedMotion), lucide-react (Plus, Clock, Check — intentionally NOT Bell since the page header has no icon; excluded to keep imports tight), useStore, types (REMINDER_CATEGORIES, WEEKDAY_LABELS, Reminder, SortOption), helpers (formatTime), cn, premium primitives (SurfaceCard, SectionHeader, EmptyState, Pressable — excluded IconBadge/StaggerItem as unused), ReminderForm, SwipeableRow, SelectionBar, SortMenu, ConfirmDialog, useSelection, toast
+   273→   273→- Updated src/app/page.tsx:
+   274→   274→  * Added `import { Reminders } from "@/components/pages/reminders";`
+   275→   275→  * Added `{tab === "reminders" && <Reminders />}` between hydration and settings
+   276→   276→- Updated src/components/pages/settings.tsx:
+   277→   277→  * Removed `Clock` from lucide imports, removed `WEEKDAY_LABELS` and `type SortOption` from @/lib/types, removed `ReminderForm`, `SwipeableRow`, `SelectionBar`, `SortMenu`, `useSelection` imports entirely
+   278→   278→  * Changed Tab type from `"theme" | "reminders" | "backup" | "archive"` to `"theme" | "backup" | "archive"`
+   279→   279→  * Removed the `{ id: "reminders", label: "Reminders", short: "Alerts", icon: Bell }` entry from the tabs array (now 3 entries: Theme, Backup, Archive)
+   280→   280→  * Removed the `{tab === "reminders" && <RemindersTab />}` line from the AnimatePresence branch
+   281→   281→  * Deleted the entire RemindersTab function (~218 lines) and the entire ReminderRow helper function (~125 lines)
+   282→   282→  * Preserved Portal helper (still used by ArchiveTab's two ConfirmDialogs), ThemeTab, ArchiveTab + ArchivedItemRow + archivedAgo, BackupTab, About card verbatim
+   283→   283→- Ran `bun run lint`: 0 errors (only the pre-existing, unrelated import/no-anonymous-default-export warning in upload/extracted/postcss.config.mjs)
+   284→   284→- Verified dev server: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` returns 200; dev.log shows clean recompiles after each edit with no runtime/compile errors
+   285→   285→
+   286→   286→Stage Summary:
+   287→   287→- Reminders is now a first-class main bottom-nav tab (6 tabs total: Home, Cycle, Journal, Water, Reminders, Settings) instead of a sub-tab inside Settings
+   288→   288→- New standalone Reminders page (src/components/pages/reminders.tsx) has its own header ("Reminders" / "Gentle nudges for your day") and preserves 100% of the lifecycle features that lived in the old RemindersTab: 4-way sort (newest/oldest/alpha/modified-by-time), premium timeline with vertical rail + circular nodes, swipe-to-delete with ConfirmDialog, long-press multi-select with portaled SelectionBar + "Select all N", bulk delete via ConfirmDialog, ReminderForm for add/edit, archived reminders filtered out, enabled/disabled toggle pills with spring animation, empty state with action
+   289→   289→- Bottom nav compacted for 6 tabs (smaller icons/labels/padding/gaps) so it still fits comfortably on a 360px screen with the layoutId spring indicator preserved
+   290→   290→- Settings now has 3 tabs (Theme, Backup, Archive) and is ~340 lines lighter; all Settings features preserved verbatim (theme gallery, archive management with restore/permanent-delete/empty-all, backup export/import/reset, About card)
+   291→   291→- Lint clean (0 errors); dev server returns 200; no runtime/compile errors
+   292→   292→
+   293→   293→---
+   294→   294→Task ID: 1+5
+   295→   295→Agent: main (orchestrator)
+   296→   296→Task: Add 8 new theme palettes + verify all changes (themes, reminders tab, dashboard, mobile responsiveness)
+   297→   297→
+   298→   298→Work Log:
+   299→   299→- Added 8 new premium themes to themes.ts + globals.css: Midnight Bloom (dark), Soft Peach, Deep Forest (dark), Sunset Glow, Coral Reef, Indigo Night (dark), Fresh Mint, Dusky Mauve — total 15 themes
+   300→   300→- Dispatched subagent for dashboard redesign (Task 3): 2x2 status grid, faded date, daily reflection, mobile-compact sizing
+   301→   301→- Dispatched subagent for reminders main tab (Task 2): 6-tab bottom nav, standalone Reminders page, removed reminders from Settings
+   302→   302→- Verified all 15 themes render correctly (tested Indigo Night dark = 9/10)
+   303→   303→- Verified 6-tab bottom nav fits at 360px
+   304→   304→- Verified all 6 tabs (Home, Cycle, Journal, Water, Reminders, Settings) fit perfectly at 360px with readable text — VLM mobile responsiveness 10/10
+   305→   305→- Verified faded date "Thursday, July 2" visible near greeting
+   306→   306→- Verified 2x2 status grid (Mood/Cycle/Streak/Next) renders clean
+   307→   307→- Verified Settings now has 3 tabs (Theme/Backup/Archive)
+   308→   308→- Lint: 0 errors; dev log clean; HTTP 200
+   309→   309→
+   310→   310→Stage Summary:
+   311→   311→- 15 total theme palettes (was 7), including 3 new dark themes
+   312→   312→- Reminders promoted to main bottom-nav tab (6 tabs total, compact for mobile)
+   313→   313→- Dashboard redesigned per attached design: faded date, 2x2 status grid, daily reflection card, compact sizing
+   314→   314→- Mobile responsiveness confirmed at 360px width across all tabs
+   315→   315→
+   316→   316→---
+   317→   317→Task ID: v3-fixes
+   318→   318→Agent: main (orchestrator)
+   319→   319→Task: Fix button-nesting hydration error + theme color switching + version bump to 3.0
+   320→   320→
+   321→   321→Work Log:
+   322→   322→- Fixed button-in-button nesting in reminders.tsx: changed outer <button> to <div role="button" tabIndex={0}> with onKeyDown handler for accessibility, allowing inner toggle <button> to be valid HTML
+   323→   323→- Diagnosed theme color issue: Tailwind v4/Lightning CSS had stale Turbopack cache (.next) that didn't include the 8 new theme CSS blocks — compiled CSS only had 7 original themes. Fixed by clearing .next cache (rm -rf .next) + clean dev server restart. Verified all 15 themes now present in compiled CSS.
+   324→   324→- Verified theme switching works LIVE (no reload needed): Indigo Night bg changed from lab(98.26) to lab(4.35) instantly, Coral and Sunset also switch correctly
+   325→   325→- Updated version to 3.0: layout.tsx metadata (generator + other.version), settings.tsx About card "Version 3.0 · Premium", package.json "3.0.0"
+   326→   326→- Verified: 0 console errors on Reminders tab (button nesting fixed), 0 lint errors, all 15 themes switch live
+   327→   327→
+   328→   328→Stage Summary:
+   329→   329→- Button nesting hydration error: FIXED (outer button → div[role=button])
+   330→   330→- Theme colors not changing: FIXED (cleared stale .next cache; all 15 themes now compile and apply live)
+   331→   331→- Version: bumped to 3.0 in metadata, settings about card, and package.json
+   332→   332→- No other changes made — rest of app untouched as requested
+   333→   333→
+   334→   334→---
+   335→   335→Task ID: v3.1-mobile-fixes
+   336→   336→Agent: main (orchestrator)
+   337→   337→Task: Fix FAB/nav collision, hero/status bar overlap, mobile spacing, add elegant serif fonts, version 3.1
+   338→   338→
+   339→   339→Work Log:
+   340→   340→- Fixed FAB collision with bottom nav: changed all 3 FABs (journal diary, journal wishlist, cycle list) from `fixed bottom-28 right-5` to `fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4` — verified 47px gap between FAB bottom and nav top (was ~23px before, now clearly separated)
+   341→   341→- Fixed hero going into status bar: changed app-shell main content padding from `pt-6` to `pt-[calc(1.5rem+env(safe-area-inset-top))]` — on mobile devices with notch/status bar, the hero now starts below the safe area
+   342→   342→- Increased bottom content padding from `pb-40` to `pb-[calc(11rem+env(safe-area-inset-bottom))]` to ensure all content clears both the nav and FAB
+   343→   343→- Added Playfair Display serif font (weights 500/600/700, normal+italic) via next/font/google in layout.tsx
+   344→   344→- Added elegant typography utilities in globals.css: `.text-display-serif`, `.text-headline-serif`, `.font-serif`, `.tracking-elegant`
+   345→   345→- Applied serif font to: hero greeting "Hello, Abantika" (text-display-serif), all page section headers (text-headline-serif via SectionHeader primitive), Daily Reflection tip text (font-serif italic), greeting label (tracking-elegant)
+   346→   346→- Updated version to 3.1: layout.tsx metadata (generator + other.version), settings.tsx About card "Version 3.1 · Premium", package.json "3.1.0"
+   347→   347→- Verified: 0 console errors, 0 lint errors, FAB gap = 47px, hero starts below status bar, serif font confirmed via getComputedStyle (Playfair Display)
+   348→   348→- VLM: 8/10 "clean, cohesive design"
+   349→   349→
+   350→   350→Stage Summary:
+   351→   351→- FAB/nav collision: FIXED (47px clear gap with safe-area-aware positioning)
+   352→   352→- Hero/status bar overlap: FIXED (safe-area-inset-top padding)
+   353→   353→- Mobile spacing: improved top + bottom padding with safe-area-aware calc values
+   354→   354→- Elegant fonts: Playfair Display serif on hero greeting, section headers, daily reflection
+   355→   355→- Version: 3.1 in metadata, settings about card, package.json
+   356→   356→
+   357→   357→---
+   358→   358→Task ID: v3.2-no-overlap
+   359→   359→Agent: main (orchestrator)
+   360→   360→Task: Remove all nav/content overlap — solid bottom nav, strict content box, no floating/transparent nav
+   361→   361→
+   362→   362→Work Log:
+   363→   363→- Rebuilt app-shell.tsx with strict separated layout:
+   364→   364→  - Content area is a scrollable <main> with paddingTop (safe-area-inset-top + 0.75rem) and paddingBottom (var(--nav-h) + 0.75rem) — content never goes under nav
+   365→   365→  - Bottom nav is now a SOLID bar (border-t + bg-elevated + shadow-lifted), NOT floating, NOT transparent, NOT glass — sits fixed at bottom with its own opaque surface
+   366→   366→  - Removed the floating rounded glass pill nav; replaced with a full-width solid bar pinned to bottom
+   367→   367→  - Exposed --nav-h CSS variable (4rem + safe-area-inset-bottom) so FABs/overlays can position above the nav
+   368→   368→- Updated all 3 FABs (journal diary, journal wishlist, cycle list): changed from fixed bottom-28/7.5rem to inline style bottom: calc(var(--nav-h, 4rem) + 0.75rem) — FABs now sit clearly above the solid nav with consistent gap
+   369→   369→- Updated UndoProvider snackbar: bottom: calc(var(--nav-h, 4rem) + 0.75rem) so undo toasts don't overlap nav
+   370→   370→- Verified across all 6 tabs: element behind nav center is always the nav's own DIV (not page content) — nav is fully opaque, zero content bleed-through
+   371→   371→- VLM: 8/10 "bottom nav is a clean solid bar separate from content, hero below status bar, no overlap"
+   372→   372→
+   373→   373→Stage Summary:
+   374→   374→- Nav/content overlap: ELIMINATED — nav is a solid opaque bar, content scrolls in its own box above it
+   375→   375→- Hero/status bar overlap: fixed (safe-area-inset-top padding)
+   376→   376→- FAB/nav collision: fixed (FABs use --nav-h variable to sit above nav)
+   377→   377→- Undo snackbar: repositioned above nav
+   378→   378→- No transparent/floating nav effects — clean separation as requested
+   379→   379→
+   380→   380→---
+   381→   381→Task ID: v3.3-form-overlay-nav-style
+   382→   382→Agent: main (orchestrator)
+   383→   383→Task: Fix form/nav overlap (forms trapped in stacking context), make nav stylish, center popups
+   384→   384→
+   385→   385→Work Log:
+   386→   386→- Root cause of form/nav overlap: forms were rendered inline inside <main> (z-10 stacking context), so their z-[100] was trapped BELOW the nav's z-50 at body level. Nav drew on top of form sheets.
+   387→   387→- Fix: Created shared Portal component (src/components/premium/portal.tsx) using useSyncExternalStore for SSR safety. Wrapped ALL 7 form sheets (reminder, cycle-entry, diary, hydration-log, mood-dialog, mood-log, wishlist) with <Portal> so they escape the main stacking context and render at document.body level — now z-[100] correctly sits above nav z-50
+   388→   388→- Changed all form sheets from items-end (bottom sheet) to items-center (centered modal) per user request "popup should totally be most up" — forms now appear as centered dialogs with full rounded-[32px] corners and p-4 padding
+   389→   389→- Made the bottom nav stylish while keeping it solid/non-overlapping: added a subtle gradient top-edge accent line (linear-gradient transparent→border→transparent), rounded-[18px] active pill with inset-0.5, py-1.5 padding, minHeight instead of fixed height for better fit, scale 0.88 inactive icons
+   390→   390→- Verified: form popup centered, backdrop covers nav completely (no overlap), nav z-50 < sheet z-100, sheet parent = BODY
+   391→   391→- VLM: form popup "centered, nav hidden behind backdrop, no overlap" | nav style "9/10, clean solid background with subtle top edge accent and gradient active tab"
+   392→   392→- Home page: no content/nav overlap, hero below status bar, nav stylish and solid
+   393→   393→- 0 console errors, 0 lint errors
+   394→   394→
+   395→   395→Stage Summary:
+   396→   396→- Form/nav overlap: FIXED via Portal (forms now render at body level above nav)
+   397→   397→- Popup position: changed from bottom-sheet to centered modal ("totally most up")
+   398→   398→- Nav style: made stylish with gradient top edge + refined active pill, still solid and non-overlapping
+   399→   399→- All 7 forms portaled; shared Portal helper created
+   400→   400→
+   401→   401→---
+   402→   402→Task ID: v3.5-glassmorphism
+   403→   403→Agent: main (orchestrator)
+   404→   404→Task: Apply glassmorphism to popups and key surfaces, version 3.5
+   405→   405→
+   406→   406→Work Log:
+   407→   407→- Created 3 glass utility classes in globals.css:
+   408→   408→  - `.glass-sheet` — strong frost for popup sheets/dialogs (rgba(255,255,255,0.55) bg, blur(32px), saturate(180%), inset highlight, gradient overlay)
+   409→   409→  - `.glass-card` — lighter glass for cards (rgba(255,255,255,0.50) bg, blur(20px), saturate(160%))
+   410→   410→  - `.glass-nav` — near-opaque frost for bottom nav (rgba(255,255,255,0.72) bg, blur(28px), for readability)
+   411→   411→  - Dark-theme overrides for noir/midnight/forest/indigo: rgba(20,20,24,0.55) bg with light-on-dark glass treatment
+   412→   412→- Applied glass-sheet to ALL 7 form popups (reminder, cycle-entry, diary, hydration-log, mood-dialog, mood-log, wishlist) replacing surface-elevated
+   413→   413→- Applied glass-sheet to mood dialog, confirm dialog, undo snackbar
+   414→   414→- Applied glass-nav to bottom navigation (replaced bg-elevated)
+   415→   415→- Applied glass-card to Daily Reflection card on dashboard
+   416→   416→- Made form sticky headers transparent with backdrop-blur-md + white/10 borders so the glass body shows through
+   417→   417→- Softened backdrops from bg-black/40 to bg-black/30 with backdrop-blur-md
+   418→   418→- Used `!important` on backdrop-filter to override Tailwind v4's variable-based backdrop system
+   419→   419→- Used explicit rgba() instead of color-mix() (Lightning CSS was stripping color-mix)
+   420→   420→- Updated version to 3.5: layout.tsx metadata, settings about card, package.json
+   421→   421→- Verified: light theme form bg=rgba(255,255,255,0.55) blur(32px), dark theme form bg=rgba(20,20,24,0.55) blur(32px)
+   422→   422→- VLM: light form 8/10 "frosted glass with blur and subtle themed tint", dark form 7/10 "frosted glass with dark-themed tint"
+   423→   423→- Lint: 0 errors
+   424→   424→
+   425→   425→Stage Summary:
+   426→   426→- Glassmorphism applied to all popup windows (forms, dialogs, snackbars) with themed gradient tint + 32px blur
+   427→   427→- Bottom nav uses glass-nav (frosted but readable)
+   428→   428→- Daily Reflection card uses glass-card
+   429→   429→- Dark themes have proper dark glass overrides
+   430→   430→- Version 3.5
+   431→   431→
+   432→   432→---
+   433→   433→Task ID: backup-restore-fix
+   434→   434→Agent: main (orchestrator)
+   435→   435→Task: Fix backup export not working on Android + add file picker import + portal dialogs
+   436→   436→
+   437→   437→Work Log:
+   438→   438→- Root cause: downloadJson() used <a download>.click() which is IGNORED by Android WebView — no file saved
+   439→   439→- Rewrote downloadJson() as async with 3-tier fallback:
+   440→   440→  1. Web Share API (navigator.share with File) — works on Android WebView 11+, iOS Safari, mobile Chrome; lets user save to Downloads or share
+   441→   441→  2. Blob download (<a download>) — works on desktop browsers
+   442→   442→  3. Clipboard copy — last resort so data is never lost
+   443→   443→- Returns {method, success} so the UI can show appropriate toast feedback
+   444→   444→- Added readJsonFile() helper using FileReader API
+   445→   445→- Rewrote BackupTab with:
+   446→   446→  - Export: async with loading state ("Preparing…") + contextual toasts (shared/copied/exported/cancelled/failed)
+   447→   447→  - Import: TWO options — "Choose file" (hidden <input type="file" accept=".json">) + "Paste JSON" (dialog with textarea)
+   448→   448→  - Reset: replaced native confirm() with premium ConfirmDialog ("Reset all data?" / "Keep my data" / "Reset everything")
+   449→   449→  - Import dialog: portaled to body via shared Portal (was trapped in main stacking context, overlapped by nav)
+   450→   450→  - Reset confirmation: portaled via Portal
+   451→   451→  - Import dialog uses glass-sheet styling, centered, above nav
+   452→   452→  - File picker auto-imports on selection + resets input so same file can be re-picked
+   453→   453→- Removed duplicate local Portal function from settings.tsx (now uses shared Portal from premium/portal.tsx)
+   454→   454→- Removed unused createPortal import
+   455→   455→- Verified: backup tab shows Download backup / Choose file / Paste JSON / Reset all data; paste dialog centered above nav; reset confirmation shows premium modal; 0 console errors; 0 lint errors
+   456→   456→
+   457→   457→Stage Summary:
+   458→   458→- Export on Android: FIXED (Web Share API lets user save to Downloads/Files or share)
+   459→   459→- Import: ENHANCED (file picker + paste JSON options)
+   460→   460→- Reset: upgraded from native confirm() to premium ConfirmDialog
+   461→   461→- Both dialogs portaled (no nav overlap)
+   462→   462→- Glassmorphism applied to paste dialog
+   463→   463→

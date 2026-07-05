@@ -5,14 +5,17 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import * as React from "react";
 import type {
   AppData,
+  AppSettings,
   CycleEntry,
   JournalEntry,
   WishlistItem,
   Reminder,
   HydrationLog,
   MoodLog,
-  ThemeId,
+  CareTask,
+  DailyTask,
 } from "./types";
+import type { ThemeId } from "./themes";
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 const nowIso = () => new Date().toISOString();
@@ -47,6 +50,50 @@ function seedMoodLogs(): MoodLog[] {
   ];
 }
 
+const defaultSettings: AppSettings = {
+  pcos: {
+    enabled: false,
+  },
+  security: {
+    pinEnabled: false,
+    biometricEnabled: false,
+    autoLockMinutes: 0,
+  },
+  appearance: {
+    amoledMode: false,
+    fontSize: "medium",
+    dynamicColors: true,
+  },
+  notifications: {
+    enabled: true,
+    sound: true,
+    vibration: true,
+  },
+};
+
+function seedCareTasks(): CareTask[] {
+  const now = nowIso();
+  const today = todayStr();
+  return [
+    { id: "seed-c1", title: "Brush teeth", emoji: "🪥", routine: "morning", time: "07:30", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    { id: "seed-c2", title: "Skincare", emoji: "✨", routine: "morning", time: "07:45", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    { id: "seed-c3", title: "Sunscreen", emoji: "☀️", routine: "morning", time: "08:00", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    { id: "seed-c4", title: "Take vitamins", emoji: "💊", routine: "morning", time: "08:30", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    { id: "seed-c5", title: "Skincare", emoji: "🌙", routine: "night", time: "21:00", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+    { id: "seed-c6", title: "Brush teeth", emoji: "🪥", routine: "night", time: "22:00", days: [true,true,true,true,true,true,true], enabled: true, completion: { [today]: false }, createdAt: now },
+  ];
+}
+
+function seedDailyTasks(): DailyTask[] {
+  const today = todayStr();
+  const now = nowIso();
+  return [
+    { id: "seed-t1", title: "Drink 8 glasses of water", emoji: "💧", priority: "medium", date: today, completed: false, recurring: "daily", createdAt: now },
+    { id: "seed-t2", title: "10 min meditation", emoji: "🧘", priority: "low", date: today, completed: false, recurring: "none", createdAt: now },
+    { id: "seed-t3", title: "Log today's mood", emoji: "😊", priority: "medium", date: today, completed: true, completedAt: now, recurring: "daily", createdAt: now },
+  ];
+}
+
 const defaultData: AppData = {
   hydration: {
     current: 750,
@@ -66,6 +113,7 @@ const defaultData: AppData = {
       reflection:
         "Woke up without an alarm and let the light pour in slowly. Sometimes the simplest mornings are the ones I needed most.",
       sticker: "🌙",
+      tags: ["gratitude", "reflection"],
     },
     {
       id: "seed-j2",
@@ -75,6 +123,8 @@ const defaultData: AppData = {
       reflection:
         "Warm tea, a good book, and quiet — I'm learning that rest is productive too.",
       sticker: "✨",
+      tags: ["joy"],
+      favorite: true,
     },
   ],
   wishlistItems: [
@@ -97,9 +147,10 @@ const defaultData: AppData = {
       id: "seed-r1",
       title: "Morning vitamins",
       time: "08:00",
-      category: "medication",
+      category: "supplements",
       days: [false, true, true, true, true, true, false],
       enabled: true,
+      frequency: "daily",
     },
     {
       id: "seed-r2",
@@ -108,6 +159,7 @@ const defaultData: AppData = {
       category: "water",
       days: [false, true, true, true, true, true, false],
       enabled: true,
+      frequency: "hourly",
     },
     {
       id: "seed-r3",
@@ -116,8 +168,12 @@ const defaultData: AppData = {
       category: "skincare",
       days: [true, true, true, true, true, true, true],
       enabled: false,
+      frequency: "daily",
     },
   ],
+  careTasks: seedCareTasks(),
+  dailyTasks: seedDailyTasks(),
+  settings: defaultSettings,
 };
 
 interface StoreState extends AppData {
@@ -150,6 +206,8 @@ interface StoreState extends AppData {
   updateJournalEntry: (id: string, e: Partial<JournalEntry>) => void;
   deleteJournalEntry: (id: string) => void;
   archiveJournalEntry: (id: string, archived: boolean) => void;
+  toggleJournalPin: (id: string) => void;
+  toggleJournalFavorite: (id: string) => void;
   bulkDeleteJournalEntries: (ids: string[]) => void;
   bulkArchiveJournalEntries: (ids: string[], archived: boolean) => void;
   // wishlist
@@ -164,15 +222,42 @@ interface StoreState extends AppData {
   updateReminder: (id: string, r: Partial<Reminder>) => void;
   deleteReminder: (id: string) => void;
   archiveReminder: (id: string, archived: boolean) => void;
+  snoozeReminder: (id: string, minutes: number) => void;
+  completeReminder: (id: string) => void;
+  skipReminder: (id: string) => void;
   bulkDeleteReminders: (ids: string[]) => void;
+  // care tasks (self-care routines)
+  addCareTask: (t: Omit<CareTask, "id" | "createdAt" | "completion">) => void;
+  updateCareTask: (id: string, t: Partial<CareTask>) => void;
+  deleteCareTask: (id: string) => void;
+  archiveCareTask: (id: string, archived: boolean) => void;
+  toggleCareTaskCompletion: (id: string, date: string) => void;
+  // daily tasks (planner)
+  addDailyTask: (t: Omit<DailyTask, "id" | "createdAt">) => void;
+  updateDailyTask: (id: string, t: Partial<DailyTask>) => void;
+  deleteDailyTask: (id: string) => void;
+  toggleDailyTask: (id: string) => void;
+  archiveDailyTask: (id: string, archived: boolean) => void;
+  // settings
+  updateSettings: (patch: Partial<AppSettings>) => void;
+  setPCOS: (patch: Partial<AppSettings["pcos"]>) => void;
+  setSecurity: (patch: Partial<AppSettings["security"]>) => void;
+  setAppearance: (patch: Partial<AppSettings["appearance"]>) => void;
   // backup
   exportData: () => string;
-  importData: (json: string) => boolean;
+  importData: (json: string, mode?: "overwrite" | "merge") => boolean;
   resetAll: () => void;
 }
 
 const uid = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+/** Deduplicate an array of objects by their `id` field (last wins). */
+function dedupe<T extends { id: string }>(arr: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const item of arr) map.set(item.id, item);
+  return Array.from(map.values());
+}
 
 export const useStore = create<StoreState>()(
   persist(
@@ -340,6 +425,18 @@ export const useStore = create<StoreState>()(
             x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
           ),
         })),
+      toggleJournalPin: (id) =>
+        set((s) => ({
+          journalEntries: s.journalEntries.map((x) =>
+            x.id === id ? { ...x, pinned: !x.pinned } : x
+          ),
+        })),
+      toggleJournalFavorite: (id) =>
+        set((s) => ({
+          journalEntries: s.journalEntries.map((x) =>
+            x.id === id ? { ...x, favorite: !x.favorite } : x
+          ),
+        })),
       bulkDeleteJournalEntries: (ids) =>
         set((s) => ({
           journalEntries: s.journalEntries.filter((x) => !ids.includes(x.id)),
@@ -407,9 +504,93 @@ export const useStore = create<StoreState>()(
           reminders: s.reminders.filter((x) => !ids.includes(x.id)),
         })),
 
+      snoozeReminder: (id, minutes) =>
+        set((s) => ({
+          reminders: s.reminders.map((x) =>
+            x.id === id
+              ? { ...x, snoozedUntil: new Date(Date.now() + minutes * 60000).toISOString() }
+              : x
+          ),
+        })),
+      completeReminder: (id) =>
+        set((s) => ({
+          reminders: s.reminders.map((x) =>
+            x.id === id ? { ...x, lastCompleted: nowIso(), snoozedUntil: undefined } : x
+          ),
+        })),
+      skipReminder: (id) =>
+        set((s) => ({
+          reminders: s.reminders.map((x) =>
+            x.id === id ? { ...x, lastSkipped: nowIso(), snoozedUntil: undefined } : x
+          ),
+        })),
+
+      // ===== Care tasks (self-care routines) =====
+      addCareTask: (t) =>
+        set((s) => ({
+          careTasks: [...s.careTasks, { ...t, id: uid(), createdAt: nowIso(), completion: {} }],
+        })),
+      updateCareTask: (id, t) =>
+        set((s) => ({
+          careTasks: s.careTasks.map((x) => (x.id === id ? { ...x, ...t } : x)),
+        })),
+      deleteCareTask: (id) =>
+        set((s) => ({ careTasks: s.careTasks.filter((x) => x.id !== id) })),
+      archiveCareTask: (id, archived) =>
+        set((s) => ({
+          careTasks: s.careTasks.map((x) =>
+            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+          ),
+        })),
+      toggleCareTaskCompletion: (id, date) =>
+        set((s) => ({
+          careTasks: s.careTasks.map((x) =>
+            x.id === id
+              ? { ...x, completion: { ...x.completion, [date]: !x.completion[date] } }
+              : x
+          ),
+        })),
+
+      // ===== Daily tasks (planner) =====
+      addDailyTask: (t) =>
+        set((s) => ({
+          dailyTasks: [...s.dailyTasks, { ...t, id: uid(), createdAt: nowIso() }],
+        })),
+      updateDailyTask: (id, t) =>
+        set((s) => ({
+          dailyTasks: s.dailyTasks.map((x) => (x.id === id ? { ...x, ...t } : x)),
+        })),
+      deleteDailyTask: (id) =>
+        set((s) => ({ dailyTasks: s.dailyTasks.filter((x) => x.id !== id) })),
+      toggleDailyTask: (id) =>
+        set((s) => ({
+          dailyTasks: s.dailyTasks.map((x) =>
+            x.id === id
+              ? { ...x, completed: !x.completed, completedAt: !x.completed ? nowIso() : undefined }
+              : x
+          ),
+        })),
+      archiveDailyTask: (id, archived) =>
+        set((s) => ({
+          dailyTasks: s.dailyTasks.map((x) =>
+            x.id === id ? { ...x, archived, archivedAt: archived ? nowIso() : undefined } : x
+          ),
+        })),
+
+      // ===== Settings =====
+      updateSettings: (patch) =>
+        set((s) => ({ settings: { ...s.settings, ...patch } })),
+      setPCOS: (patch) =>
+        set((s) => ({ settings: { ...s.settings, pcos: { ...s.settings.pcos, ...patch } } })),
+      setSecurity: (patch) =>
+        set((s) => ({ settings: { ...s.settings, security: { ...s.settings.security, ...patch } } })),
+      setAppearance: (patch) =>
+        set((s) => ({ settings: { ...s.settings, appearance: { ...s.settings.appearance, ...patch } } })),
+
       exportData: () => {
         const s = get();
         const payload = {
+          version: "5.0",
           hydration: s.hydration,
           hydrationLogs: s.hydrationLogs,
           moodLogs: s.moodLogs,
@@ -418,24 +599,48 @@ export const useStore = create<StoreState>()(
           journalEntries: s.journalEntries,
           wishlistItems: s.wishlistItems,
           reminders: s.reminders,
+          careTasks: s.careTasks,
+          dailyTasks: s.dailyTasks,
+          settings: s.settings,
           exportedAt: new Date().toISOString(),
         };
         return JSON.stringify(payload, null, 2);
       },
 
-      importData: (json) => {
+      importData: (json, mode = "overwrite") => {
         try {
           const parsed = JSON.parse(json);
-          set((s) => ({
-            hydration: parsed.hydration ?? s.hydration,
-            hydrationLogs: parsed.hydrationLogs ?? s.hydrationLogs,
-            moodLogs: parsed.moodLogs ?? s.moodLogs,
-            mood: parsed.mood ?? s.mood,
-            cycleEntries: parsed.cycleEntries ?? [],
-            journalEntries: parsed.journalEntries ?? [],
-            wishlistItems: parsed.wishlistItems ?? [],
-            reminders: parsed.reminders ?? [],
-          }));
+          if (mode === "merge") {
+            // Merge: keep existing, add new (dedupe by id)
+            set((s) => ({
+              cycleEntries: dedupe([...s.cycleEntries, ...(parsed.cycleEntries ?? [])]),
+              journalEntries: dedupe([...s.journalEntries, ...(parsed.journalEntries ?? [])]),
+              wishlistItems: dedupe([...s.wishlistItems, ...(parsed.wishlistItems ?? [])]),
+              reminders: dedupe([...s.reminders, ...(parsed.reminders ?? [])]),
+              careTasks: dedupe([...s.careTasks, ...(parsed.careTasks ?? [])]),
+              dailyTasks: dedupe([...s.dailyTasks, ...(parsed.dailyTasks ?? [])]),
+              hydrationLogs: dedupe([...s.hydrationLogs, ...(parsed.hydrationLogs ?? [])]),
+              moodLogs: dedupe([...s.moodLogs, ...(parsed.moodLogs ?? [])]),
+              hydration: parsed.hydration ?? s.hydration,
+              mood: parsed.mood ?? s.mood,
+              settings: parsed.settings ? { ...s.settings, ...parsed.settings } : s.settings,
+            }));
+          } else {
+            // Overwrite (default)
+            set((s) => ({
+              hydration: parsed.hydration ?? s.hydration,
+              hydrationLogs: parsed.hydrationLogs ?? s.hydrationLogs,
+              moodLogs: parsed.moodLogs ?? s.moodLogs,
+              mood: parsed.mood ?? s.mood,
+              cycleEntries: parsed.cycleEntries ?? [],
+              journalEntries: parsed.journalEntries ?? [],
+              wishlistItems: parsed.wishlistItems ?? [],
+              reminders: parsed.reminders ?? [],
+              careTasks: parsed.careTasks ?? [],
+              dailyTasks: parsed.dailyTasks ?? [],
+              settings: parsed.settings ? { ...defaultSettings, ...parsed.settings } : s.settings,
+            }));
+          }
           return true;
         } catch {
           return false;
@@ -446,11 +651,26 @@ export const useStore = create<StoreState>()(
         set(() => ({
           ...defaultData,
           theme: get().theme,
+          settings: defaultSettings,
         })),
     }),
     {
-      name: "abantika-wellness-v2",
+      name: "abantika-wellness-v5",
       storage: createJSONStorage(() => localStorage),
+      version: 5,
+      // Migrate from v2 storage key
+      migrate: (persisted: any, version: number) => {
+        if (!persisted) return persisted;
+        // Ensure new fields exist for older data
+        return {
+          ...persisted,
+          careTasks: persisted.careTasks ?? [],
+          dailyTasks: persisted.dailyTasks ?? [],
+          settings: persisted.settings
+            ? { ...defaultSettings, ...persisted.settings }
+            : defaultSettings,
+        };
+      },
       partialize: (s) => ({
         theme: s.theme,
         hydration: s.hydration,
@@ -461,6 +681,9 @@ export const useStore = create<StoreState>()(
         journalEntries: s.journalEntries,
         wishlistItems: s.wishlistItems,
         reminders: s.reminders,
+        careTasks: s.careTasks,
+        dailyTasks: s.dailyTasks,
+        settings: s.settings,
       }),
     }
   )

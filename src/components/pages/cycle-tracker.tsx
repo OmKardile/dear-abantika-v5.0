@@ -15,6 +15,12 @@ import {
   List as ListIcon,
   Check,
   Plus,
+  HeartPulse,
+  Activity,
+  AlertTriangle,
+  CalendarClock,
+  ShieldAlert,
+  Brain,
 } from "lucide-react";
 import {
   format,
@@ -28,11 +34,31 @@ import {
   endOfWeek,
   isSameMonth,
   isToday,
+  addDays,
+  subDays,
+  differenceInDays,
 } from "date-fns";
+import {
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  ReferenceLine,
+} from "recharts";
 import { useStore } from "@/lib/store";
 import { dateKey } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
-import type { CycleEntry, SortOption } from "@/lib/types";
+import {
+  MEDICAL_DISCLAIMER,
+  PCOS_SYMPTOMS,
+  type CycleEntry,
+  type SortOption,
+} from "@/lib/types";
 import {
   SurfaceCard,
   SectionHeader,
@@ -63,10 +89,82 @@ const CYCLE_FILTERS: { id: CycleFilter; label: string }[] = [
 
 type CycleView = "calendar" | "list" | "insights";
 
+/* ---------- v5.0 cycle math helpers ---------- */
+
+/** Group consecutive period days into periods; return their start dates (asc). */
+function getPeriodStarts(entries: CycleEntry[]): Date[] {
+  const periodDays = entries
+    .filter((e) => e.isPeriod)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const starts: Date[] = [];
+  let prev: Date | null = null;
+  for (const e of periodDays) {
+    const d = new Date(e.date + "T00:00:00");
+    if (!prev || differenceInDays(d, prev) > 1) starts.push(d);
+    prev = d;
+  }
+  return starts;
+}
+
+/** Cycle lengths (days) between consecutive period starts. */
+function getCycleLengths(entries: CycleEntry[]): { date: Date; length: number }[] {
+  const starts = getPeriodStarts(entries);
+  const out: { date: Date; length: number }[] = [];
+  for (let i = 1; i < starts.length; i++) {
+    out.push({
+      date: starts[i],
+      length: differenceInDays(starts[i], starts[i - 1]),
+    });
+  }
+  return out;
+}
+
+function avgCycleLength(entries: CycleEntry[], fallback = 28): number {
+  const lens = getCycleLengths(entries).map((c) => c.length);
+  if (lens.length === 0) return fallback;
+  return Math.round(lens.reduce((a, b) => a + b, 0) / lens.length);
+}
+
+function cycleStddev(entries: CycleEntry[]): number {
+  const lens = getCycleLengths(entries).map((c) => c.length);
+  if (lens.length < 2) return 0;
+  const mean = lens.reduce((a, b) => a + b, 0) / lens.length;
+  const variance =
+    lens.reduce((a, b) => a + (b - mean) ** 2, 0) / lens.length;
+  return Math.sqrt(variance);
+}
+
+/** Confidence % for predictions, based on data regularity. */
+function predictionConfidence(
+  entries: CycleEntry[],
+  pcosEnabled: boolean
+): number {
+  const lens = getCycleLengths(entries).map((c) => c.length);
+  if (lens.length === 0) return 0;
+  const stddev = cycleStddev(entries);
+  let base = Math.max(30, 95 - stddev * 7);
+  if (lens.length < 3) base -= (3 - lens.length) * 12;
+  if (pcosEnabled) base = Math.min(base, 70);
+  return Math.max(15, Math.min(95, Math.round(base)));
+}
+
+const CONFIDENCE_LABEL = (c: number) => {
+  if (c >= 75) return "High confidence";
+  if (c >= 50) return "Moderate confidence";
+  if (c > 0) return "Low confidence";
+  return "Not enough data";
+};
+
+
 export function CycleTracker() {
   const reduce = useReducedMotion();
-  const { cycleEntries, addCycleEntry, updateCycleEntry, deleteCycleEntry } =
-    useStore();
+  const {
+    cycleEntries,
+    addCycleEntry,
+    updateCycleEntry,
+    deleteCycleEntry,
+    settings,
+  } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [editingEntry, setEditingEntry] = useState<CycleEntry | undefined>();
@@ -96,6 +194,84 @@ export function CycleTracker() {
   }, [cycleEntries]);
   const maxCount = symptomCounts[0]?.[1] ?? 1;
 
+  // ---------- v5.0 prediction + PCOS ----------
+  const pcosEnabled = settings.pcos.enabled;
+  const avgLen =
+    pcosEnabled && settings.pcos.cycleLengthAvg
+      ? settings.pcos.cycleLengthAvg
+      : avgCycleLength(cycleEntries, 28);
+  const periodStarts = useMemo(
+    () => getPeriodStarts(cycleEntries),
+    [cycleEntries]
+  );
+  const lastPeriodStart =
+    periodStarts.length > 0 ? periodStarts[periodStarts.length - 1] : null;
+  const predictedStart = lastPeriodStart
+    ? addDays(lastPeriodStart, avgLen)
+    : null;
+  // uncertainty window — wider in PCOS mode
+  const uncertaintyDays = pcosEnabled ? 5 : 2;
+  const predictedWindowStart = predictedStart
+    ? subDays(predictedStart, uncertaintyDays)
+    : null;
+  const predictedWindowEnd = predictedStart
+    ? addDays(predictedStart, uncertaintyDays)
+    : null;
+  const confidence = predictionConfidence(cycleEntries, pcosEnabled);
+
+  const daysAway = predictedStart
+    ? differenceInDays(predictedStart, new Date())
+    : null;
+
+  const isPredictedDay = (d: Date) => {
+    if (!predictedWindowStart || !predictedWindowEnd) return false;
+    return (
+      d >= predictedWindowStart && d <= predictedWindowEnd && !getEntry(d)?.isPeriod
+    );
+  };
+
+  // cycle history chart data
+  const cycleHistoryData = useMemo(
+    () =>
+      getCycleLengths(cycleEntries).map((c) => ({
+        date: format(c.date, "MMM d"),
+        length: c.length,
+      })),
+    [cycleEntries]
+  );
+
+  // pain trend chart data
+  const painTrendData = useMemo(
+    () =>
+      cycleEntries
+        .filter((e) => typeof e.painScale === "number")
+        .sort((a, b) => (a.date < b.date ? -1 : 1))
+        .map((e) => ({
+          date: format(new Date(e.date), "MMM d"),
+          pain: e.painScale as number,
+        })),
+    [cycleEntries]
+  );
+
+  // symptom heatmap (last 3 months, GitHub-style weeks)
+  const heatmapWeeks = useMemo(() => {
+    const end = new Date();
+    const start = startOfWeek(subMonths(end, 3), { weekStartsOn: 0 });
+    const weeks: Date[][] = [];
+    let cursor = start;
+    while (cursor <= end) {
+      const week: Date[] = [];
+      for (let i = 0; i < 7; i++) week.push(addDays(cursor, i));
+      weeks.push(week);
+      cursor = addDays(cursor, 7);
+    }
+    return weeks;
+  }, []);
+  const symptomCountForDay = (d: Date) => {
+    const entry = cycleEntries.find((e) => isSameDay(new Date(e.date), d));
+    return entry?.symptoms.length ?? 0;
+  };
+
   const openNew = (date: Date) => {
     setSelectedDate(date);
     setEditingEntry(undefined);
@@ -115,11 +291,22 @@ export function CycleTracker() {
         initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
+        className="flex items-start justify-between gap-3"
       >
         <SectionHeader
           title="Cycle Tracker"
           subtitle="Gentle, private insights"
         />
+        {pcosEnabled && (
+          <motion.span
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="shrink-0 mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-secondary border border-border text-caption font-bold text-text-primary"
+          >
+            <HeartPulse size={13} className="text-primary" />
+            PCOS Mode
+          </motion.span>
+        )}
       </motion.div>
 
       {/* 3-way segmented control */}
@@ -209,6 +396,9 @@ export function CycleTracker() {
                   const inMonth = isSameMonth(day, currentDate);
                   const today = isToday(day);
                   const isSelected = selectedDate && isSameDay(day, selectedDate);
+                  const predicted = isPredictedDay(day);
+                  const isPredictedCenter =
+                    predictedStart && isSameDay(day, predictedStart);
                   return (
                     <motion.button
                       key={i}
@@ -223,6 +413,8 @@ export function CycleTracker() {
                         today,
                         selected: !!isSelected,
                         isPeriod: entry?.isPeriod,
+                        isPredicted: predicted,
+                        isPredictedCenter,
                       })}
                     >
                       <span
@@ -230,6 +422,8 @@ export function CycleTracker() {
                           "relative z-10 text-sm font-semibold",
                           entry?.isPeriod
                             ? "text-primary-foreground"
+                            : isPredictedCenter
+                            ? "text-primary"
                             : inMonth
                             ? "text-text-primary"
                             : "text-text-tertiary",
@@ -248,6 +442,9 @@ export function CycleTracker() {
                           ))}
                         </span>
                       )}
+                      {isPredictedCenter && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary" />
+                      )}
                       {today && (
                         <span className="absolute inset-0 rounded-xl ring-2 ring-primary/40 pointer-events-none" />
                       )}
@@ -257,7 +454,7 @@ export function CycleTracker() {
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-4 mt-5 pt-4 border-t border-divider">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-5 pt-4 border-t border-divider">
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded-full gradient-primary-bg" />
                   <span className="text-caption text-text-secondary">Period</span>
@@ -265,6 +462,12 @@ export function CycleTracker() {
                 <div className="flex items-center gap-1.5">
                   <span className="w-1 h-1 rounded-full bg-chart-3" />
                   <span className="text-caption text-text-secondary">Symptoms</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-md border-2 border-dashed border-primary/50 bg-primary/10" />
+                  <span className="text-caption text-text-secondary">
+                    Predicted
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5 ml-auto">
                   <CalendarDays size={13} className="text-text-tertiary" />
@@ -274,6 +477,69 @@ export function CycleTracker() {
                 </div>
               </div>
             </SurfaceCard>
+
+            {/* Prediction card */}
+            {predictedStart && (
+              <SurfaceCard className="p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <CalendarClock size={18} className="text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-title text-text-primary font-semibold">
+                        Next period
+                      </p>
+                      {pcosEnabled && confidence > 0 && (
+                        <span
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide",
+                            confidence >= 75
+                              ? "bg-chart-2/20 text-chart-2"
+                              : confidence >= 50
+                              ? "bg-warning/20 text-warning"
+                              : "bg-error/15 text-error"
+                          )}
+                        >
+                          {confidence}% · {CONFIDENCE_LABEL(confidence)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-body text-text-primary mt-1 font-semibold">
+                      {format(predictedStart, "EEE, MMM d")}
+                      {daysAway !== null && (
+                        <span className="text-text-secondary font-normal">
+                          {" "}
+                          ·{" "}
+                          {daysAway > 0
+                            ? `est. ${daysAway} day${daysAway === 1 ? "" : "s"} away`
+                            : daysAway === 0
+                            ? "estimated today"
+                            : `${Math.abs(daysAway)} day${Math.abs(daysAway) === 1 ? "" : "s"} overdue`}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-caption text-text-secondary mt-0.5">
+                      Window:{" "}
+                      {format(predictedWindowStart!, "MMM d")} –{" "}
+                      {format(predictedWindowEnd!, "MMM d")}
+                      {" · "}
+                      avg {avgLen}-day cycle
+                      {pcosEnabled ? " · PCOS ±5d" : " · ±2d"}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-start gap-2 rounded-2xl bg-surface-secondary p-3">
+                  <AlertTriangle
+                    size={14}
+                    className="text-warning shrink-0 mt-0.5"
+                  />
+                  <p className="text-caption text-text-secondary leading-relaxed">
+                    {MEDICAL_DISCLAIMER}
+                  </p>
+                </div>
+              </SurfaceCard>
+            )}
 
             {/* Quick stats */}
             <div className="grid grid-cols-2 gap-4">
@@ -342,7 +608,120 @@ export function CycleTracker() {
                   <AnimatedCounter value={periodDays} />
                 </p>
               </SurfaceCard>
+              <SurfaceCard className="p-5">
+                <p className="text-label text-text-tertiary">Avg cycle</p>
+                <p className="text-headline text-text-primary mt-1">
+                  {avgLen}
+                  <span className="text-body text-text-secondary ml-1 font-medium">
+                    days
+                  </span>
+                </p>
+              </SurfaceCard>
+              <SurfaceCard className="p-5">
+                <p className="text-label text-text-tertiary">Cycles logged</p>
+                <p className="text-headline text-text-primary mt-1">
+                  <AnimatedCounter value={cycleHistoryData.length} />
+                </p>
+              </SurfaceCard>
             </div>
+
+            {/* Cycle history chart */}
+            <SurfaceCard className="p-5">
+              <SectionHeader
+                title="Cycle history"
+                subtitle="Cycle length over time"
+                className="mb-4"
+              />
+              {cycleHistoryData.length === 0 ? (
+                <EmptyState
+                  emoji="📈"
+                  title="Need more data"
+                  description="Log two or more period start dates to see your cycle length trend."
+                />
+              ) : (
+                <div className="w-full h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={cycleHistoryData}
+                      margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="cycleGrad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="var(--chart-1)"
+                            stopOpacity={0.5}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="var(--chart-1)"
+                            stopOpacity={0.02}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--divider)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={32}
+                      />
+                      <RTooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid var(--divider)",
+                          background: "var(--surface)",
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: "var(--text-secondary)" }}
+                        formatter={(v: number) => [`${v} days`, "Cycle"]}
+                      />
+                      <ReferenceLine
+                        y={avgLen}
+                        stroke="var(--chart-4)"
+                        strokeDasharray="4 4"
+                        label={{
+                          value: "avg",
+                          fontSize: 10,
+                          fill: "var(--chart-4)",
+                          position: "right",
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="length"
+                        stroke="var(--chart-1)"
+                        strokeWidth={2.5}
+                        fill="url(#cycleGrad)"
+                        dot={{
+                          r: 3,
+                          fill: "var(--chart-1)",
+                          strokeWidth: 0,
+                        }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </SurfaceCard>
 
             {/* Top symptoms */}
             <SurfaceCard className="p-5">
@@ -387,6 +766,221 @@ export function CycleTracker() {
                 </div>
               )}
             </SurfaceCard>
+
+            {/* Symptom heatmap (last 3 months) */}
+            <SurfaceCard className="p-5">
+              <SectionHeader
+                title="Symptom heatmap"
+                subtitle="Last 3 months · daily intensity"
+                className="mb-4"
+              />
+              <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
+                <div className="flex gap-1 min-w-max">
+                  {heatmapWeeks.map((week, wi) => (
+                    <div key={wi} className="flex flex-col gap-1">
+                      {week.map((day, di) => {
+                        const count = symptomCountForDay(day);
+                        const future = day > new Date();
+                        return (
+                          <div
+                            key={di}
+                            title={`${format(day, "MMM d")} · ${count} symptom${count === 1 ? "" : "s"}`}
+                            className={cn(
+                              "w-3 h-3 rounded-[4px] transition-colors",
+                              future
+                                ? "bg-transparent"
+                                : count === 0
+                                ? "bg-surface-secondary"
+                                : count === 1
+                                ? "bg-primary/30"
+                                : count === 2
+                                ? "bg-primary/50"
+                                : count === 3
+                                ? "bg-primary/70"
+                                : "bg-primary"
+                            )}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3 justify-end">
+                <span className="text-[10px] text-text-tertiary">Less</span>
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-surface-secondary" />
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-primary/30" />
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-primary/50" />
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-primary/70" />
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-primary" />
+                <span className="text-[10px] text-text-tertiary">More</span>
+              </div>
+            </SurfaceCard>
+
+            {/* Pain trend */}
+            {painTrendData.length > 0 && (
+              <SurfaceCard className="p-5">
+                <SectionHeader
+                  title="Pain trend"
+                  subtitle="Pain scale over logged days"
+                  className="mb-4"
+                />
+                <div className="w-full h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={painTrendData}
+                      margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--divider)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        domain={[0, 10]}
+                        ticks={[0, 5, 10]}
+                        tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={32}
+                      />
+                      <RTooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid var(--divider)",
+                          background: "var(--surface)",
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: "var(--text-secondary)" }}
+                        formatter={(v: number) => [`${v}/10`, "Pain"]}
+                      />
+                      <ReferenceLine
+                        y={5}
+                        stroke="var(--warning)"
+                        strokeDasharray="4 4"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="pain"
+                        stroke="var(--chart-5)"
+                        strokeWidth={2.5}
+                        dot={{
+                          r: 3,
+                          fill: "var(--chart-5)",
+                          strokeWidth: 0,
+                        }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </SurfaceCard>
+            )}
+
+            {/* PCOS panel */}
+            {pcosEnabled && (
+              <SurfaceCard className="p-5 border border-primary/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-9 h-9 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <HeartPulse size={16} className="text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-title text-text-primary font-semibold">
+                      PCOS insights
+                    </p>
+                    <p className="text-caption text-text-secondary">
+                      Pattern & irregularity overview
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="rounded-2xl bg-surface-secondary p-3.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Activity size={13} className="text-text-tertiary" />
+                      <p className="text-label text-text-tertiary">
+                        Cycle irregularity
+                      </p>
+                    </div>
+                    <p className="text-headline text-text-primary">
+                      ±{cycleStddev(cycleEntries).toFixed(1)}
+                      <span className="text-caption text-text-secondary ml-1 font-medium">
+                        days
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-text-tertiary mt-0.5">
+                      std. deviation
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-surface-secondary p-3.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Brain size={13} className="text-text-tertiary" />
+                      <p className="text-label text-text-tertiary">
+                        Ovulation certainty
+                      </p>
+                    </div>
+                    <p className="text-headline text-text-primary">
+                      {confidence > 0 ? `${confidence}%` : "—"}
+                    </p>
+                    <p className="text-[10px] text-text-tertiary mt-0.5">
+                      {CONFIDENCE_LABEL(confidence)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* PCOS symptom trend summary */}
+                <div className="rounded-2xl bg-surface-secondary p-3.5 mb-4">
+                  <p className="text-label text-text-tertiary mb-2">
+                    PCOS-flagged symptom trends
+                  </p>
+                  {(() => {
+                    const pcosCounts = PCOS_SYMPTOMS.map((s) => ({
+                      s,
+                      n: cycleEntries.filter((e) => e.symptoms.includes(s))
+                        .length,
+                    })).filter((x) => x.n > 0);
+                    if (pcosCounts.length === 0)
+                      return (
+                        <p className="text-caption text-text-secondary">
+                          No PCOS-related symptoms logged yet.
+                        </p>
+                      );
+                    return (
+                      <div className="flex flex-wrap gap-1.5">
+                        {pcosCounts
+                          .sort((a, b) => b.n - a.n)
+                          .map(({ s, n }) => (
+                            <span
+                              key={s}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface border border-border text-caption text-text-primary font-medium"
+                            >
+                              {s}
+                              <span className="text-primary font-bold">{n}×</span>
+                            </span>
+                          ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="flex items-start gap-2 rounded-2xl bg-warning/10 p-3">
+                  <ShieldAlert
+                    size={14}
+                    className="text-warning shrink-0 mt-0.5"
+                  />
+                  <p className="text-caption text-text-secondary leading-relaxed">
+                    {MEDICAL_DISCLAIMER}
+                  </p>
+                </div>
+              </SurfaceCard>
+            )}
 
             {/* Recent entries */}
             {cycleEntries.length > 0 && (
@@ -445,6 +1039,7 @@ export function CycleTracker() {
         onOpenChange={setFormOpen}
         date={selectedDate ? dateKey(selectedDate) : dateKey(new Date())}
         existing={editingEntry}
+        pcosEnabled={pcosEnabled}
         onSave={(entry) => {
           if (editingEntry) updateCycleEntry(editingEntry.id, entry);
           else addCycleEntry(entry);
@@ -840,18 +1435,25 @@ function cnDay({
   today,
   selected,
   isPeriod,
+  isPredicted,
+  isPredictedCenter,
 }: {
   inMonth: boolean;
   today: boolean;
   selected: boolean;
   isPeriod?: boolean;
+  isPredicted?: boolean;
+  isPredictedCenter?: boolean;
 }) {
   return cn(
     "relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
     isPeriod
       ? "gradient-primary-bg shadow-glow"
+      : isPredicted
+      ? "bg-primary/10 border-2 border-dashed border-primary/40"
       : "hover:bg-surface-secondary",
     !inMonth && "opacity-35",
+    isPredictedCenter && "ring-2 ring-primary/60",
     selected && "ring-2 ring-primary ring-offset-2 ring-offset-surface"
   );
 }

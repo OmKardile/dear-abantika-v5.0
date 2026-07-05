@@ -36,8 +36,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Abantika" }],
   applicationName: "Abantika",
-  generator: "Abantika v3.5",
-  other: { version: "3.5" },
+  generator: "Abantika v5.0",
+  other: { version: "5.0" },
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
