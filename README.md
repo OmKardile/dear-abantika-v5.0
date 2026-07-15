@@ -6,7 +6,7 @@
 
   
 
-**Version 3.0** · Built with Next.js 16, TypeScript, Tailwind CSS 4, Framer Motion, and Capacitor for native mobile packaging.
+**Version 5.0** · Built with Next.js 16, TypeScript, Tailwind CSS 4, Framer Motion, and Capacitor for native mobile packaging.
 
   
 
