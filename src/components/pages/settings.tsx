@@ -142,44 +142,18 @@ export function Settings() {
           <IconBadge icon={Info} variant="soft" size={40} />
           <div>
             <p className="text-title text-text-primary">About Abantika</p>
-            <p className="text-caption text-text-secondary">Version 5.0 · Premium</p>
+            <p className="text-caption text-text-secondary">Version 3.5 · Premium</p>
           </div>
         </div>
-        <p className="text-body text-text-secondary leading-relaxed">
-          A private wellness companion. All your data lives only on this device —
-          nothing is ever sent anywhere. Crafted with care for your daily rituals.
+    <p className="text-body text-text-secondary leading-relaxed">
+          A private wellness companion for my dear love Avantika Kardile. 
+          All data lives only on this device —
+          nothing is ever sent anywhere. Crafted with care😚 & love💕 for her.
         </p>
+        <div className="mt-4 font-style: italic flex items-center gap-1.5 text-caption text-text-tertiary">
+          Made with <Heart size={12} className="text-primary" fill="currentColor" /> By <a target="_blank" href="https://omkardile-portfolio.vercel.app/" className="text-blue-500 link underline hover:text-blue-700 link-primary link-hover "> Omkar </a>
 
-        {/* Status chips */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-secondary">
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full shrink-0",
-                settings.pcos.enabled ? "bg-success" : "bg-text-tertiary"
-              )}
-            />
-            <span className="text-caption text-text-secondary">PCOS Mode</span>
-            <span className="text-caption font-semibold text-text-primary ml-auto">
-              {settings.pcos.enabled ? "On" : "Off"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-secondary">
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full shrink-0",
-                settings.security.pinEnabled ? "bg-success" : "bg-text-tertiary"
-              )}
-            />
-            <span className="text-caption text-text-secondary">App Lock</span>
-            <span className="text-caption font-semibold text-text-primary ml-auto">
-              {settings.security.pinEnabled ? "On" : "Off"}
-            </span>
-          </div>
-        </div>
 
-        <div className="mt-4 flex items-center gap-1.5 text-caption text-text-tertiary">
-          Made with <Heart size={12} className="text-primary" fill="currentColor" /> for gentle days
         </div>
       </SurfaceCard>
     </div>
@@ -278,7 +252,7 @@ function ThemeTab() {
   return (
     <div className="space-y-4">
       <p className="text-body text-text-secondary px-1">
-        Choose a palette that feels like home. Transitions are instant.
+        Choose a palette that feels like home, or omkars love. 😚😁👍
       </p>
 
       {/* AMOLED quick-toggle */}

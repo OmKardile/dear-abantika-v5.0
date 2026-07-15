@@ -10,20 +10,20 @@ export function dateKey(d: Date): string {
 
 export function greeting(): string {
   const h = new Date().getHours();
-  if (h < 5) return "Resting hours";
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  if (h < 21) return "Good evening";
-  return "Good night";
+  if (h < 5) return "Resting hours, ( Bubu tum kahan ho?😭😿 )";
+  if (h < 12) return "Gul Molnin,Uth gya bacha?💕";
+  if (h < 17) return "Good afternoon babu💕";
+  if (h < 21) return "Good evening golmatol rasmalai💕";
+  return "Good night mela Gulgulu pulpulu💕";
 }
 
 export function greetingSub(): string {
   const h = new Date().getHours();
-  if (h < 5) return "Hope you're sleeping soundly.";
-  if (h < 12) return "A soft start to your day.";
-  if (h < 17) return "Take a breath, you're doing well.";
-  if (h < 21) return "Time to unwind a little.";
-  return "Be gentle with yourself tonight.";
+  if (h < 5) return "Hope you're sleeping soundly. 🤗";
+  if (h < 12) return "A soft start to your day. Nahake send pic !!";
+  if (h < 17) return "Take a breath, you're doing well. Sojao Thoda😗";
+  if (h < 21) return "Time to unwind a little. Padhai deko 🫡";
+  return "Be gentle with yourself tonight. ily babu💕";
 }
 
 export function formatTime(time: string): string {

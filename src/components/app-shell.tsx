@@ -80,7 +80,7 @@ export function AppShell({
       <main
         className="relative z-10 w-full max-w-md flex-1 overflow-y-auto scroll-area"
         style={{
-          paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)",
+          paddingTop: "calc(env(safe-area-inset-top) + 2.75rem)",
           paddingBottom: "calc(var(--nav-h) + 0.75rem)",
           minHeight: "100dvh",
           WebkitOverflowScrolling: "touch",

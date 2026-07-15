@@ -23,9 +23,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Abantika — Premium Wellness Companion",
+  title: "abantikas companion in absence of Omkar",
   description:
-    "A luxurious, private wellness companion for hydration, mood, cycle, journaling and mindful reminders.",
+    "A luxurious, private wellness companion for hydration, mood, cycle, journaling and mindful reminders. Help when I am not with her.",
   keywords: [
     "wellness",
     "hydration",
@@ -34,12 +34,12 @@ export const metadata: Metadata = {
     "journal",
     "mindfulness",
   ],
-  authors: [{ name: "Abantika" }],
-  applicationName: "Abantika",
+  authors: [{ name: "omkar" }],
+  applicationName: "Dear Abantika",
   generator: "Abantika v5.0",
   other: { version: "5.0" },
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "https://i.ibb.co/93tgkqKv/playstore-icon.png",
   },
 };
 
